@@ -7,15 +7,19 @@ private:
     T* data_;
     int size_;
     int maximum_;
+    int lineSize_;
+    int lines_;
 public:
     byteLog();
     int size();
     int max();
-    void changeMax(int newMax);
+    void setMax(int newMax);
+    void setLineSize(int newLineSize);
+    int lineSize();
     void push(T data);
-    int push(T* data,int amt); // returns shift
+    int push(T* data,int amt);
     T get(int elementNum);
-    T* get(int lineNum, int lineSize);
+    T* getLine(int lineNum);
     void exportInFile();
     void clear();
     ~byteLog();
