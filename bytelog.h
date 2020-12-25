@@ -1,10 +1,11 @@
 #ifndef BYTELOG_H
 #define BYTELOG_H
-template <typename T>
+
 class byteLog
 {
 private:
-    T* data_;
+    unsigned char* data_;
+    unsigned char* buffer;
     int lineSize_;
     int lines_;
     int size_;
@@ -17,12 +18,16 @@ public:
     void setMax(int linesAmt, int lineSize);
     void setLineSize(int newLineSize);
     int lineSize();
-    void push(T data);
-    int push(T* data,int amt);
-    T get(int elementNum);
-    T* getLine(int lineNum);
+    int lines();
+    void push(unsigned char data);
+    int push(const unsigned char* data,int amt);
+    unsigned char get(int elementNum);
+    unsigned char* getLine(int lineNum);
     void exportInFile();
     void clear();
+    unsigned char* data();
+    unsigned char at(int pos);
+    unsigned char* toText(int ps);
     ~byteLog();
 };
 
