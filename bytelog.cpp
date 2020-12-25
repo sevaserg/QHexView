@@ -5,7 +5,7 @@ template <typename T>
 byteLog<T>::byteLog()
 {
     lineSize_ = 20;
-    int maximum_ = 200000;
+    maximum_ = 200000;
     this->data_ = static_cast<T*>(malloc(0));
     this->size_ = 0;
 }
@@ -19,7 +19,7 @@ int byteLog<T>::size()
 template <typename T>
 int byteLog<T>::lineSize()
 {
-
+    return lineSize_;
 }
 
 template <typename T>
