@@ -5,10 +5,10 @@ class byteLog
 {
 private:
     T* data_;
-    int size_;
-    int maximum_;
     int lineSize_;
     int lines_;
+    int size_;
+    int maximum_;
 public:
     byteLog();
     int size();
@@ -25,5 +25,6 @@ public:
     void clear();
     ~byteLog();
 };
+
 
 #endif // BYTELOG_H

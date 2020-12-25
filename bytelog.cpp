@@ -48,7 +48,6 @@ void byteLog<T>::setMax(int newMax)
     maximum_ = newMax;                                                  //максимум меняем
 }
 
-
 template <typename T>
 void byteLog<T>::setMax(int linesAmt, int lineSize)
 {
