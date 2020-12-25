@@ -14,6 +14,7 @@ public:
     int size();
     int max();
     void setMax(int newMax);
+    void setMax(int linesAmt, int lineSize);
     void setLineSize(int newLineSize);
     int lineSize();
     void push(T data);
@@ -24,4 +25,5 @@ public:
     void clear();
     ~byteLog();
 };
+
 #endif // BYTELOG_H

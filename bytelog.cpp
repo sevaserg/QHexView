@@ -48,6 +48,14 @@ void byteLog<T>::setMax(int newMax)
     maximum_ = newMax;                                                  //максимум меняем
 }
 
+
+template <typename T>
+void byteLog<T>::setMax(int linesAmt, int lineSize)
+{
+    lineSize_ = lineSize;
+    setMax(linesAmt*lineSize);
+}
+
 template <typename T>
 void byteLog<T>::push(T data)
 {
@@ -83,10 +91,10 @@ int byteLog<T>::push(T* data, int amt)
         int shifts = amt / lineSize_;   //здесь учитываем, сколько сдвигов строк нам нужно
         int k = size_ % lineSize_;      //сколько в последней строке элементов и так находится
         int l = amt % lineSize_;        //сколько элементов в последней строке нового сообщения
-        if (k+l > lineSize_)            //Если суммарно элементов в последних строках оказалось больше, производим ещё один сдвиг
+        if (k+l > lineSize_ || size_ == maximum_)            //Если суммарно элементов в последних строках оказалось больше, производим ещё один сдвиг
             shifts++;
-        T* tmp = static_cast<T*>( malloc(static_cast<size_t>(size_)) ); //создаём такой же массив
-        memmove(tmp, data_ + amt + shifts * lineSize_, static_cast<size_t>(size_ - shifts * lineSize_)); //переносим туда лог, но без последних строк
+        T* tmp = static_cast<T*>( malloc(static_cast<size_t>(size_ + amt - shifts * lineSize_)) ); //создаём такой же массив
+        memmove(tmp, data_ + (shifts) * lineSize_, static_cast<size_t>(size_ - shifts * lineSize_)); //переносим туда лог, но без последних строк
         memmove(tmp+(size_ - shifts * lineSize_), data, static_cast<size_t>(amt));                       //переносим новую информацию
         size_ += amt - shifts * lineSize_; //пересчитываем размер
         free(data_); //удаляем старый массив
