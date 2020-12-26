@@ -13,9 +13,8 @@
 
 #include <QMenu>
 
-#include <QPushButton>
 #include <QGroupBox>
-
+#include <QShortcut>
 #include "bytelog.h"
 
 class QByteView : public QGroupBox
@@ -24,10 +23,11 @@ Q_OBJECT
 private:
 
 protected:
-    QScrollBar* scroller;
+
+    QScrollBar *vscroller, *hscroller, *scroller;
     QHBoxLayout* mainLayout;
     QPlainTextEdit* field;
-    QTimer *timer;
+   // QTimer *timer;
     byteLog* log;
     unsigned char* buf_;
     int bsize_;
@@ -36,6 +36,9 @@ protected:
     int linesAmt_;
     int bytesInLine_;
     int shifts;
+
+    int dispLines_;
+
 public:
     QByteView(QGroupBox *parent = 0); //PointSys = 16, linesAmt = 10000, bytesInLine = 16
     void updateAscii();
@@ -53,7 +56,9 @@ public:
 
     ~QByteView();
 protected slots:
-    void slotTimerAlarm();
+    void scrMoved(int val);
+    //void slotTimerAlarm();
     void ShowContextMenu(const QPoint &pos);
+
 };
 #endif // QBYTEVIEW_H

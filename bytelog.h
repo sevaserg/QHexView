@@ -18,7 +18,7 @@ public:
     void setMax(int linesAmt, int lineSize);
     void setLineSize(int newLineSize);
     int lineSize();
-    int lines();
+    int maxLines();
     void push(unsigned char data);
     int push(const unsigned char* data,int amt);
     unsigned char get(int elementNum);
@@ -28,6 +28,8 @@ public:
     unsigned char* data();
     unsigned char at(int pos);
     unsigned char* toText(int ps);
+    int linesAmt();
+    int lastLineSize();
     ~byteLog();
 };
 

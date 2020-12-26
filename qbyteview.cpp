@@ -1,39 +1,72 @@
 #include "qbyteview.h"
 #include <iostream>
 using namespace std;
-bool lastState = true;
 
 QByteView::QByteView(QGroupBox *parent) : QGroupBox ( parent )//PointSys = 16, linesAmt = 10000, bytesInLine = 16
 {
+    dispLines_ = 50;
+
+
     mainLayout = new QHBoxLayout;
+    mainLayout->setMargin(0);
     log = new byteLog;
     field = new QPlainTextEdit;
+    vscroller = new QScrollBar;
+    hscroller = new QScrollBar;
     scroller = new QScrollBar;
-    field->setVerticalScrollBar(scroller);
-    field->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-    field->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-    field->setVisible(false);
-    mainLayout->addWidget(field);
+    scroller->setMaximum(0);
+    connect(scroller, SIGNAL(sliderMoved(int value)), this, SLOT(scrMoved(int val)));
+    field->setVerticalScrollBar(vscroller);
+    field->setHorizontalScrollBar(hscroller);
+
+    field->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+    field->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+
     pointSys_ = 16;
-    linesAmt_ = 2000;
+    linesAmt_ = 20000;
     bytesInLine_ = 17;
     log->setMax(linesAmt_, bytesInLine_);
     connect(this, SIGNAL(customContextMenuRequested(const QPoint &)),
             this, SLOT(ShowContextMenu(const QPoint &)));
-    timer = new QTimer(this);
-    connect(timer, SIGNAL(timeout()), this, SLOT(slotTimerAlarm()));
-    timer->start(250);
-    field->setVisible(true);
+    //timer = new QTimer(this);
+    //connect(timer, SIGNAL(timeout()), this, SLOT(slotTimerAlarm()));
+
+    //field->setVisible(true);
+    //timer->start(1000);
     buf_ = static_cast<unsigned char *>(malloc(0));
     shifts = 0;
+
+    mainLayout->addWidget(field);
+    mainLayout->addWidget(scroller);
+    this->setLayout(mainLayout);
+    this->show();
 }
 
 void QByteView::updateAscii()
 {
+    field->clear();
+    field->appendPlainText(QString::number(scroller->value()) + " / " + QString::number(log->linesAmt()) + ":\n");
     if (log->size() > 0)
     {
-        field->clear();
-        field->setPlainText(QString(reinterpret_cast<char *>(log->data())));
+        int lines = min(dispLines_, log->linesAmt());
+        for (int i = 0; i < lines; i++)
+        {
+            unsigned char *out = static_cast<unsigned char*>(malloc(static_cast<size_t>(bytesInLine_)));
+
+            memcpy(out, log->data()+bytesInLine_*(scroller->value()+i), static_cast<size_t>(log->lineSize()));
+            int symsamt = (scroller->value()+i == log->linesAmt() ? log->lastLineSize() : bytesInLine_);
+            for (int j = 0; j < bytesInLine_; j++)
+            {
+                if (out[j] < 32 || out[j] > 126)
+                    out[j] = '.';
+            }
+
+            if (i != lines-1)
+            {
+                field->appendPlainText(QString(reinterpret_cast<char*>(out)));
+            }
+            free(out);
+        }
     }
 }
 
@@ -82,9 +115,18 @@ int QByteView::bytesInLine()
 
 void QByteView::putData(const QByteArray & arr)
 {
+    cout << "data pushed!"<< endl;
+    bool isMax = scroller->isMaximized();
     int tmp =log->push(reinterpret_cast<const unsigned char *>(arr.data()), arr.size());
     shifts+=tmp;
-    lastState = tmp >= 0;
+    tmp = log->linesAmt()-dispLines_;
+    int tmp2 = scroller->value();
+    scroller->setMaximum(tmp <= 0 ? 0 : tmp);
+    if (isMax)
+        scroller->setValue(scroller->maximum());
+    else
+        scroller->setValue(tmp2);
+    updateAscii();
 }
 
 void QByteView::putData(const QString & str)
@@ -98,7 +140,7 @@ QByteView::~QByteView()
     free(buf_);
     delete log;
     delete field;
-    delete timer;
+    //delete timer;
     delete mainLayout;
     delete scroller;
 }
@@ -106,7 +148,6 @@ QByteView::~QByteView()
 void QByteView::ShowContextMenu(const QPoint &pos)
 {
    QMenu contextMenu(tr("Context menu"), this);
-
    QAction action1("Remove Data Point", this);
    connect(&action1, SIGNAL(triggered()), this, SLOT(removeDataPoint()));
    contextMenu.addAction(&action1);
@@ -114,11 +155,11 @@ void QByteView::ShowContextMenu(const QPoint &pos)
    contextMenu.exec(mapToGlobal(pos));
 }
 
+
+
+/*
 void QByteView::slotTimerAlarm()
 {
-    for (int i = log->size()-log->lineSize(); i < log->size();i++)
-    cout << log->at(i);
-    cout << '\t' << log->size() << "/" <<log->max()<< '\t' << (lastState ? "true" : "false")<< endl;
     if (scroller->maximum() == scroller->value() || (shifts == 0))
     {
 
@@ -131,4 +172,10 @@ void QByteView::slotTimerAlarm()
             scroller->setValue(scrVal);
         shifts = 0;
     }
+    updateAscii();
+}*/
+
+void QByteView::scrMoved(int val)
+{
+    updateAscii();
 }

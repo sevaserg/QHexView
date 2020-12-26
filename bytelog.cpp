@@ -4,6 +4,11 @@
 #include <memory.h>
 #include <string.h>
 
+
+#include <iostream>
+    using namespace std;
+
+
 byteLog::byteLog()
 {
     lineSize_ = 20;
@@ -37,8 +42,8 @@ void byteLog::setMax(int newMax)
 {
     if (size_ > newMax)                                                 // Если новый максимальный размер меньше числа элементов
     {
-        unsigned char* tmp = static_cast<unsigned char *>( malloc(newMax) );           //создаём массив tmp величиной с новый максимум
-        memmove(tmp,data_+(maximum_ - newMax - 1), newMax);   //переносим все последние влезающие значения из data_
+        unsigned char* tmp = static_cast<unsigned char *>( malloc(static_cast<size_t>(newMax)) );           //создаём массив tmp величиной с новый максимум
+        memmove(tmp,data_+(maximum_ - newMax - 1), static_cast<size_t>(newMax));   //переносим все последние влезающие значения из data_
         size_ = newMax;                                                 //меняем размер на новый максимум
         free(data_);                                                    //меняем старый "большой" массив
         data_ = tmp;                                                    //на новый
@@ -52,7 +57,7 @@ void byteLog::setMax(int linesAmt, int lineSize)
     setMax(linesAmt*lineSize);
 }
 
-int byteLog::lines()
+int byteLog::maxLines()
 {
     return lines_;
 }
@@ -61,12 +66,12 @@ void byteLog::push(unsigned char data)
 {
     if (size_ != maximum_)                                      //в случае, если элемент влезает
     {
-        data_ = static_cast<unsigned char*>( realloc(data_, ++size_) );     //просто расширяем массив на один элемент
+        data_ = static_cast<unsigned char*>( realloc(data_, static_cast<size_t>(++size_)) );     //просто расширяем массив на один элемент
     }
     else //иначе сдвигаем элементы в массиве влево на "строку" (n позиций)
     {
-        unsigned char* tmp = static_cast<unsigned char*>( malloc((size_ - lineSize_)));       //создаём такой же по размеру массив
-        memmove( tmp, data_+sizeof(unsigned char), (size_-lineSize_) );           // переносим все элементы начиная с n-того, наким образом последний элемент свободен
+        unsigned char* tmp = static_cast<unsigned char*>( malloc(static_cast<size_t>(size_ - lineSize_)));       //создаём такой же по размеру массив
+        memmove( tmp, data_+sizeof(unsigned char), static_cast<size_t>(size_-lineSize_) );           // переносим все элементы начиная с n-того, наким образом последний элемент свободен
         free(data_);                                                            //удаляем старый массив
         data_ = tmp;                                                            //присваиваем новый
         size_-=lineSize_+1;                                                       //Не забываем указать в size_, что массив стал на строку легче. Плюс один элемент.
@@ -76,17 +81,30 @@ void byteLog::push(unsigned char data)
 
 int byteLog::push(const unsigned char* data, int amt)
 {
+
     if (amt > maximum_)                                                             //возвращаем -1, если вталкваемое значение больше максимума.
-        return -1;
+    {
+
+       return -1;
+    }
+    cout << "data accepted!"<< endl;
     if (amt <= maximum_-size_)                                                      //если обрезать ничего не потребуется,
     {
+        cout << "NO SHIFT. SIZE: " << size_ << endl;
+        cout << "============-------------------" << endl;
         data_ = static_cast<unsigned char *>(realloc(data_,static_cast<size_t>(size_+amt)));     //расширяем массив с содержимым лога
+
         memmove(data_+static_cast<size_t>(size_), data, static_cast<size_t>(amt));  //и кладём в конец новые данные
         size_+=amt;                                                                 //увеличиваем размер на число новых значений
         return 0;                                                                   //Сдвигать ничего не потребовалось.
+
     }
+
     else //если сдвигать всё же требуется
     {
+        cout << "SHIFT. SIZE: " << size_ << endl;
+        cout << "============-----------==========" << endl;
+
         int shifts = amt / lineSize_;   //здесь учитываем, сколько сдвигов строк нам нужно
         int k = size_ % lineSize_;      //сколько в последней строке элементов и так находится
         int l = amt % lineSize_;        //сколько элементов в последней строке нового сообщения
@@ -111,8 +129,8 @@ unsigned char byteLog::get(int elementNum)
 
 unsigned char* byteLog::getLine(int lineNum)
 {
-    buffer = static_cast<unsigned char*>(malloc(lineSize_+1));
-    memmove(buffer, data_+lineNum*lineSize_, lineSize_);
+    buffer = static_cast<unsigned char*>(malloc(static_cast<size_t>(lineSize_+1)));
+    memmove(buffer, data_+lineNum*lineSize_, static_cast<size_t>(lineSize_));
     if (lineNum < (size_ / lineSize_))
         buffer[lineSize_] = '\n';
     return buffer;
@@ -156,6 +174,16 @@ unsigned char* byteLog::toText(int ps)
         tmp = static_cast<unsigned char *>(realloc(tmp, static_cast<size_t>(size_ + lines_ -1)));
         return tmp;
     }
+}
+
+int byteLog::linesAmt()
+{
+    return size_ / lineSize_;
+}
+
+int byteLog::lastLineSize()
+{
+    return size_ % lineSize_;
 }
 
 byteLog::~byteLog()
