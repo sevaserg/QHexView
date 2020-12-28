@@ -10,6 +10,12 @@
 #include <QElapsedTimer>
 #include <QTimer>
 #include <QScrollBar>
+#include <QPainter>
+#include <QGraphicsScene>
+#include <QGraphicsView>
+
+#include <QGraphicsSimpleTextItem>
+#include <QGraphicsRectItem>
 
 #include <QMenu>
 
@@ -23,11 +29,18 @@ Q_OBJECT
 private:
 
 protected:
-
+    inline int symsInPS();
     QScrollBar *vscroller, *hscroller, *scroller;
     QHBoxLayout* mainLayout;
     QPlainTextEdit* field;
-   // QTimer *timer;
+    QGraphicsScene* data;
+    QGraphicsView* dataView;
+    QGraphicsSimpleTextItem*num;
+    QGraphicsSimpleTextItem*matrix;
+    QGraphicsSimpleTextItem*asciiMatrix;
+    QGraphicsRectItem* colChoice, *colChoice2, *tabChoice;
+    QFont f;
+    // QTimer *timer;
     byteLog* log;
     unsigned char* buf_;
     int bsize_;
@@ -39,9 +52,14 @@ protected:
 
     int dispLines_;
 
+    void redraw();
+    void updateAscii();
+    void resizeEvent(QResizeEvent*);
+    void setAsciiLines();
+    void setByteLines();
 public:
     QByteView(QGroupBox *parent = 0); //PointSys = 16, linesAmt = 10000, bytesInLine = 16
-    void updateAscii();
+
     void setMaxLines(int maxLines, int bytesInLine_);
     bool setPS(int ps);
     void clear();

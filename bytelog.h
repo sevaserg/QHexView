@@ -10,6 +10,7 @@ private:
     int lines_;
     int size_;
     int maximum_;
+    int asciiShift;
 public:
     byteLog();
     int size();
@@ -29,7 +30,9 @@ public:
     unsigned char at(int pos);
     unsigned char* toText(int ps);
     int linesAmt();
+    int asciiLines();
     int lastLineSize();
+    unsigned char* asciiLine(int lineNum);
     ~byteLog();
 };
 

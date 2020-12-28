@@ -16,6 +16,7 @@ byteLog::byteLog()
     this->data_ = static_cast<unsigned char*>(malloc(0));
     this->size_ = 0;
     buffer = static_cast<unsigned char*>(malloc(0));
+    asciiShift = 0;
 }
 
 int byteLog::size()
@@ -116,6 +117,9 @@ int byteLog::push(const unsigned char* data, int amt)
         size_ += amt - shifts * lineSize_; //пересчитываем размер
         free(data_); //удаляем старый массив
         data_ = tmp; //меняем на новый
+
+        //Считаем сдвиги по ASCII
+
         return shifts; //возвращаем число строк, на которые, в случае чего, требуется сдвинуть курсор
     }
 }
@@ -174,6 +178,42 @@ unsigned char* byteLog::toText(int ps)
         tmp = static_cast<unsigned char *>(realloc(tmp, static_cast<size_t>(size_ + lines_ -1)));
         return tmp;
     }
+}
+
+int byteLog::asciiLines()
+{
+    int lns = 0;
+    for (int i = 0; i < size_; i++)
+        if (data_[i] == '\n')
+            lns++;
+    return lns;
+}
+
+unsigned char* byteLog::asciiLine(int lineNum)
+{
+    int pos1 = 0, pos2 = 0;
+    unsigned char* ret;
+    int cnt = 0;
+    for (int i = 0; i < size_; i++)
+    {
+        if ((data_[i] == '\n') || (i == size_-1))
+        {
+            pos1 = pos2;
+            pos2 = i;
+            cnt++;
+        }
+        if (cnt == lineNum)
+            break;
+    }
+    if (pos1 == pos2)
+        return NULL;
+    ret = static_cast<unsigned char*>(malloc(static_cast<size_t>(pos2-pos1)));
+    memcpy(ret, data_+pos1+1, pos2-pos1);
+    /*for (int i = pos1+1, j = 0; i < pos2; i++, j++)
+    {
+        ret[j] = data_[i];
+    }*/
+    return ret;
 }
 
 int byteLog::linesAmt()
