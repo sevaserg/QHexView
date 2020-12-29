@@ -23,6 +23,20 @@
 #include <QShortcut>
 #include "bytelog.h"
 
+class custGView : public QGraphicsView
+{
+private:
+    QGraphicsRectItem* colChoice, *colChoice2, *tabChoice;
+public:
+    int col[2];
+    int col2[2];
+    int tab[2];
+    custGView();
+    void resize();
+    void printRects();
+    void mouseMoveEvent(QMouseEvent *event);
+};
+
 class QByteView : public QGroupBox
 {
 Q_OBJECT
@@ -34,12 +48,14 @@ protected:
     QHBoxLayout* mainLayout;
     QPlainTextEdit* field;
     QGraphicsScene* data;
-    QGraphicsView* dataView;
+    custGView* dataView;
     QGraphicsSimpleTextItem*num;
     QGraphicsSimpleTextItem*matrix;
     QGraphicsSimpleTextItem*asciiMatrix;
     QGraphicsRectItem* colChoice, *colChoice2, *tabChoice;
     QFont f;
+
+    bool isTextDisplayed_;
     // QTimer *timer;
     byteLog* log;
     unsigned char* buf_;
@@ -52,14 +68,18 @@ protected:
 
     int dispLines_;
 
+    void mouseMoveEvent(QGraphicsSceneMouseEvent *event);
+
     void redraw();
     void updateAscii();
     void resizeEvent(QResizeEvent*);
+    void contextMenuEvent( QContextMenuEvent * e );
     void setAsciiLines();
     void setByteLines();
 public:
+    void switchViews();
     QByteView(QGroupBox *parent = 0); //PointSys = 16, linesAmt = 10000, bytesInLine = 16
-
+    bool isTextDisplayed();
     void setMaxLines(int maxLines, int bytesInLine_);
     bool setPS(int ps);
     void clear();
@@ -77,6 +97,10 @@ protected slots:
     void scrMoved(int val);
     //void slotTimerAlarm();
     void ShowContextMenu(const QPoint &pos);
-
+    void slotSwitchViews();
+    void slotClear();
 };
+
+
+
 #endif // QBYTEVIEW_H

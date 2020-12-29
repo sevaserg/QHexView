@@ -2,6 +2,48 @@
 #include <iostream>
 using namespace std;
 
+custGView::custGView()
+{
+    for (int i = 0; i < 2; i++)
+    {
+        tab[i] = 0;
+        col[i] = 0;
+        col2[i] = 0;
+    }
+    //tabChoice = new QGraphicsRectItem(0,0,1000,20);
+    //colChoice = new QGraphicsRectItem(0,0,30,450);
+    //colChoice2 = new QGraphicsRectItem(0,0,10,450);
+}
+
+void custGView::resize()
+{
+}
+
+void custGView::printRects()
+{
+    tabChoice = new QGraphicsRectItem(tab[0],tab[1],1000,20);
+    colChoice = new QGraphicsRectItem(col[0],col[1],30,450);
+    colChoice2 = new QGraphicsRectItem(col2[0],col2[1],10,450);
+    this->scene()->addItem(colChoice);
+    this->scene()->addItem(colChoice2);
+    this->scene()->addItem(tabChoice);
+}
+
+void custGView::mouseMoveEvent(QMouseEvent *event)
+{
+    if (event->pos().x() > 50 && event->pos().x() < 650)
+    {
+        col[0] = event->pos().x() - event->pos().x() % 30 - 10;
+        colChoice->setX(col[0]);
+    }
+    tab[1] = event->pos().y() - event->pos().y() % 20;
+    tabChoice->setY(tab[1]);
+
+    cout << event->pos().x() << " " << event->pos().y() << endl;
+
+
+}
+
 QByteView::QByteView(QGroupBox *parent) : QGroupBox ( parent )//PointSys = 16, linesAmt = 10000, bytesInLine = 16
 {
     dispLines_ = 20;
@@ -25,14 +67,17 @@ QByteView::QByteView(QGroupBox *parent) : QGroupBox ( parent )//PointSys = 16, l
     field->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
     field->setLineWrapMode(QPlainTextEdit::NoWrap);
+    field->setAttribute(Qt::WA_TransparentForMouseEvents);
 
     data = new QGraphicsScene;
 
-    dataView = new QGraphicsView(data);
+    dataView = new custGView;
+    dataView->setScene(data);
 
     dataView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
     dataView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
+    dataView->setMouseTracking(true);
 
     pointSys_ = 16;
     linesAmt_ = 20000;
@@ -46,18 +91,30 @@ QByteView::QByteView(QGroupBox *parent) : QGroupBox ( parent )//PointSys = 16, l
     //timer = new QTimer(this);
     //connect(timer, SIGNAL(timeout()), this, SLOT(slotTimerAlarm()));
 
-    //field->setVisible(true);
     //timer->start(1000);
     buf_ = static_cast<unsigned char *>(malloc(0));
     shifts = 0;
 
-    mainLayout->addWidget(dataView);
+    //mainLayout->addWidget(dataView);
 
-    //mainLayout->addWidget(field);
+
+
+
+
+
+    mainLayout->addWidget(field);
+    mainLayout->addWidget(dataView);
+    dataView->hide();
+    isTextDisplayed_ = true;
     mainLayout->addWidget(scroller);
     this->setLayout(mainLayout);
     this->show();
     redraw();
+}
+
+bool QByteView::isTextDisplayed()
+{
+    return isTextDisplayed_;
 }
 
 inline int QByteView::symsInPS()
@@ -65,15 +122,17 @@ inline int QByteView::symsInPS()
     return (pointSys_ >= 16 ? 2 : pointSys_ >= 8 ? 4 : pointSys_ >= 4 ? 6 : 8);
 }
 
-
 void QByteView::redraw()
 {
+    dataView->resize();
     matrix = new QGraphicsSimpleTextItem[20*dispLines_];
     asciiMatrix = new QGraphicsSimpleTextItem[20*dispLines_];
     num = new QGraphicsSimpleTextItem[dispLines_];
     int offset = 650, strOffset = 50;
     data->clear();
     dataView->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+    dataView->printRects();
+
     //item1->setBrush(QBrush(Qt::red));
     //item2->setBrush(QBrush(Qt::green));
     //item3->setBrush(QBrush(Qt::blue));
@@ -86,10 +145,10 @@ void QByteView::redraw()
         num[i].moveBy(5, 20*i);
         for (int j = 0; j < 320 / pointSys_; j++)
         {
-            if(log->linesAmt() > scroller->value()+20*i+j)
+            if(log->linesAmt() > (scroller->value()+i)*20+j)
             {
                 QString str = "";
-                char info =(static_cast<char>((log->data()[scroller->value()+20*i+j])));
+                char info =(static_cast<char>((log->data()[20*(scroller->value()+i)+j])));
                 asciiMatrix[20*i+j].setText(QString(info));
                 for (int i = 0; i < symsInPS();i++)
                 {
@@ -155,6 +214,7 @@ void QByteView::updateAscii()
 //        field->appendPlainText(s);
         free(t);
     }
+    field->textCursor().deletePreviousChar();
 }
 
 void QByteView::setMaxLines(int maxLines, int bytesInLine)
@@ -205,19 +265,23 @@ void QByteView::putData(const QByteArray & arr)
     cout << "data pushed!"<< endl;
     bool isMax = scroller->isMaximized();
     int shift =log->push(reinterpret_cast<const unsigned char *>(arr.data()), arr.size());
-
+    cout << "Shifts: " << shift << ". Strings filled: " << log->linesAmt() << " out of " << log->max() / log->lineSize() << endl;
     //tmp = log->linesAmt()-dispLines_;
-    int tmp;
+    int newMaxLines;
     if (field->isHidden())
-        tmp = log->linesAmt()-dispLines_;
+        newMaxLines = log->linesAmt()-dispLines_;
     else
-        tmp = log->asciiLines()-dispLines_;
+        newMaxLines = log->asciiLines()-dispLines_;
     int tmp2 = scroller->value();
-    scroller->setMaximum(tmp <= 0 ? 0 : tmp);
+    scroller->setMaximum(newMaxLines <= 0 ? 0 : newMaxLines);
+    if (field->isHidden())
+        log->asciiShift();
+    else
+        shift = log->asciiShift();
     if (isMax)
         scroller->setValue(scroller->maximum());
     else
-        scroller->setValue((tmp2 <= shift ? 0 : tmp2-shift));
+       scroller->setValue((tmp2 <= shift ? 0 : tmp2-shift));
     updateAscii();
     redraw();
 }
@@ -321,5 +385,50 @@ void QByteView::scrMoved(int val)
 void QByteView::resizeEvent(QResizeEvent*)
 {
     setByteLines();
+    updateAscii();
     redraw();
+}
+
+void QByteView::switchViews()
+{
+    if (isTextDisplayed_)
+    {
+        field->hide();
+        cout << "Text displayed"<<endl;
+        dataView->show();
+        redraw();
+    }
+    else
+    {
+        dataView->hide();
+        cout << "Hex displayed"<<endl;
+        field->show();
+        updateAscii();
+    }
+
+    isTextDisplayed_ = !isTextDisplayed_;
+}
+
+void QByteView::slotSwitchViews()
+{
+    switchViews();
+}
+
+void QByteView::slotClear()
+{
+    clear();
+}
+
+void QByteView::contextMenuEvent( QContextMenuEvent * e )
+{
+    QMenu* pContextMenu = new QMenu( this);
+    QAction *pSwitchAction = new QAction("Switch view",this);
+    connect(pSwitchAction,SIGNAL(triggered()),this,SLOT(slotSwitchViews()));
+    QAction *pClearAction = new QAction("Clear",this);
+    connect(pClearAction ,SIGNAL(triggered()),this,SLOT(slotClear()));
+    pContextMenu->addAction(pSwitchAction);
+    pContextMenu->addAction(pClearAction );
+    //
+    pContextMenu->exec( e->globalPos() );
+    delete pContextMenu;
 }

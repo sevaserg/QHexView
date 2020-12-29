@@ -16,7 +16,7 @@ byteLog::byteLog()
     this->data_ = static_cast<unsigned char*>(malloc(0));
     this->size_ = 0;
     buffer = static_cast<unsigned char*>(malloc(0));
-    asciiShift = 0;
+    asciiShift_ = 0;
 }
 
 int byteLog::size()
@@ -114,6 +114,13 @@ int byteLog::push(const unsigned char* data, int amt)
         unsigned char* tmp = static_cast<unsigned char*>( malloc(static_cast<size_t>(size_ + amt - shifts * lineSize_)) ); //создаём такой же массив
         memmove(tmp, data_ + (shifts) * lineSize_, static_cast<size_t>(size_ - shifts * lineSize_)); //переносим туда лог, но без последних строк
         memmove(tmp+(size_ - shifts * lineSize_), data, static_cast<size_t>(amt));                       //переносим новую информацию
+
+        for (int i = 0; i < (shifts) * lineSize_; i++) //считаем число сдвигов по ascii (число выдвинутых \n)
+        {
+            if (data_[i] == '\n')
+                asciiShift_++;
+        }
+
         size_ += amt - shifts * lineSize_; //пересчитываем размер
         free(data_); //удаляем старый массив
         data_ = tmp; //меняем на новый
@@ -224,6 +231,13 @@ int byteLog::linesAmt()
 int byteLog::lastLineSize()
 {
     return size_ % lineSize_;
+}
+
+int byteLog::asciiShift()
+{
+    int tmp = asciiShift_;
+    asciiShift_ = 0;
+    return tmp;
 }
 
 byteLog::~byteLog()
