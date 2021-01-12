@@ -4,10 +4,8 @@
 #include <memory.h>
 #include <string.h>
 
-
 #include <iostream>
-    using namespace std;
-
+using namespace std;
 
 byteLog::byteLog()
 {
@@ -15,7 +13,6 @@ byteLog::byteLog()
     maximum_ = 200000;
     this->data_ = static_cast<unsigned char*>(malloc(0));
     this->size_ = 0;
-    buffer = static_cast<unsigned char*>(malloc(0));
     asciiShift_ = 0;
 }
 
@@ -80,6 +77,30 @@ void byteLog::push(unsigned char data)
     data_[size_-1] = data;                                                      //в последнюю ячейку кладём элемент
 }
 
+int byteLog::ALNToBLN(int ALN) // ASCII Line Number to Byte Line Number
+{
+    int i = 0, cntr = 0;
+    for (i = 0; i < size_; i++)
+    {
+        if (data_[i] == '\n')
+            cntr++;
+        if (cntr == ALN)
+            break;
+    }
+    return i / lineSize_;
+}
+
+int byteLog::BLNToALN(int BLN) // Byte Line Number to ASCII Line Number
+{
+    int i = 0, cntr = 0;
+    for (i = 0; i < BLN * lineSize_; i++)
+    {
+        if (data_[i] == '\n')
+            cntr++;
+    }
+    return cntr;
+}
+
 int byteLog::push(const unsigned char* data, int amt)
 {
 
@@ -88,11 +109,8 @@ int byteLog::push(const unsigned char* data, int amt)
 
        return -1;
     }
-    cout << "data accepted!"<< endl;
     if (amt <= maximum_-size_)                                                      //если обрезать ничего не потребуется,
     {
-        cout << "NO SHIFT. SIZE: " << size_ << endl;
-        cout << "============-------------------" << endl;
         data_ = static_cast<unsigned char *>(realloc(data_,static_cast<size_t>(size_+amt)));     //расширяем массив с содержимым лога
 
         memmove(data_+static_cast<size_t>(size_), data, static_cast<size_t>(amt));  //и кладём в конец новые данные
@@ -103,9 +121,6 @@ int byteLog::push(const unsigned char* data, int amt)
 
     else //если сдвигать всё же требуется
     {
-        cout << "SHIFT. SIZE: " << size_ << endl;
-        cout << "============-----------==========" << endl;
-
         int shifts = amt / lineSize_;   //здесь учитываем, сколько сдвигов строк нам нужно
         int k = size_ % lineSize_;      //сколько в последней строке элементов и так находится
         int l = amt % lineSize_;        //сколько элементов в последней строке нового сообщения
@@ -198,10 +213,10 @@ int byteLog::asciiLines()
 
 unsigned char* byteLog::asciiLine(int lineNum)
 {
-    int pos1 = 0, pos2 = 0;
+    size_t pos1 = 0, pos2 = 0;
     unsigned char* ret;
     int cnt = 0;
-    for (int i = 0; i < size_; i++)
+    for (size_t i = 0; i < size_; i++)
     {
         if ((data_[i] == '\n') || (i == size_-1))
         {
@@ -212,14 +227,12 @@ unsigned char* byteLog::asciiLine(int lineNum)
         if (cnt == lineNum)
             break;
     }
-    if (pos1 == pos2)
+    if (pos1 == pos2 || pos1 == pos2-1)
         return NULL;
     ret = static_cast<unsigned char*>(malloc(static_cast<size_t>(pos2-pos1)));
-    memcpy(ret, data_+pos1+1, pos2-pos1);
-    /*for (int i = pos1+1, j = 0; i < pos2; i++, j++)
-    {
-        ret[j] = data_[i];
-    }*/
+    memcpy(ret, data_+pos1+(pos1 == 0 ? 0:1), pos2-pos1);
+    ret[pos2-pos1-1] = '\0';
+
     return ret;
 }
 

@@ -20,6 +20,8 @@ public:
     void setLineSize(int newLineSize);
     int lineSize();
     int maxLines();
+    int ALNToBLN(int ALN);
+    int BLNToALN(int BLN);
     void push(unsigned char data);
     int push(const unsigned char* data,int amt);
     unsigned char get(int elementNum);
