@@ -14,7 +14,8 @@
 #include <QScrollBar>
 #include <QGraphicsTextItem>
 #include <QMenu>
-
+#include <QApplication>
+#include <QClipboard>
 #include <QGroupBox>
 #include <QShortcut>
 #include "bytelog.h"
@@ -38,8 +39,8 @@ protected:
     QFont f;
 
     bool isTextDisplayed_;
+    bool enableHighlight;
     bool chooseFirst;
-    int chosenFirst;
     byteLog* log;
     unsigned char* buf_;
     int bsize_;
@@ -148,10 +149,15 @@ public:
     ~QByteView();
 protected slots:
     void scrMoved(int val);
-    //void slotTimerAlarm();
     void ShowContextMenu(const QPoint &pos);
     void slotSwitchViews();
     void slotClear();
+    void slotCopy();
+    void slotChooseFirst();
+    void slotChooseSecond();
+    void slotScrDwn();
+    void slotGoToHighlighted();
+    void slotEnableHighlighting();
 };
 
 

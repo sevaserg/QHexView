@@ -6,20 +6,30 @@ class byteLog
 private:
     unsigned char* data_;
     unsigned char* buffer;
+    int firstSel_;
+    int secondSel_;
     int lineSize_;
     int lines_;
     int size_;
     int maximum_;
     int asciiShift_;
+    int lastAsciiSel1_;
+    int lastAsciiSel2_;
 public:
     byteLog();
     int size();
-    int max();
+    int max_();
     void setMax(int newMax);
     void setMax(int linesAmt, int lineSize);
     void setLineSize(int newLineSize);
     int lineSize();
     int maxLines();
+    void setFirstSel(int num);
+    void setSecondSel(int num);
+    int firstSel();
+    int secondSel();
+    int lastAsciiSel1();
+    int lastAsciiSel2();
     int ALNToBLN(int ALN);
     int BLNToALN(int BLN);
     void push(unsigned char data);
@@ -33,7 +43,10 @@ public:
     unsigned char* toText(int ps);
     int linesAmt();
     int asciiLines();
+    int getFirstSymInAsciiLine(int lineNum);
+    char* getHighlighted();
     int lastLineSize();
+    int asciiLineLen(int lineNum);
     int asciiShift();
     unsigned char* asciiLine(int lineNum);
     ~byteLog();

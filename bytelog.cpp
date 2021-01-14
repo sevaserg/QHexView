@@ -1,4 +1,5 @@
 #include "bytelog.h"
+#include <stdlib.h>
 #include <malloc.h>
 #include <stdio.h>
 #include <memory.h>
@@ -14,6 +15,8 @@ byteLog::byteLog()
     this->data_ = static_cast<unsigned char*>(malloc(0));
     this->size_ = 0;
     asciiShift_ = 0;
+    firstSel_ = -1;
+    secondSel_ = -1;
 }
 
 int byteLog::size()
@@ -31,7 +34,7 @@ void byteLog::setLineSize(int newLineSize)
     lineSize_ = newLineSize;
 }
 
-int byteLog::max()
+int byteLog::max_()
 {
     return maximum_;
 }
@@ -75,6 +78,36 @@ void byteLog::push(unsigned char data)
         size_-=lineSize_+1;                                                       //Не забываем указать в size_, что массив стал на строку легче. Плюс один элемент.
     }
     data_[size_-1] = data;                                                      //в последнюю ячейку кладём элемент
+}
+
+void byteLog::setFirstSel(int num)
+{
+    firstSel_ = num;
+}
+
+void byteLog::setSecondSel(int num)
+{
+    secondSel_ = num;
+}
+
+int byteLog::firstSel()
+{
+    return firstSel_;
+}
+
+int byteLog::secondSel()
+{
+    return secondSel_;
+}
+
+int byteLog::lastAsciiSel1()
+{
+    return lastAsciiSel1_;
+}
+
+int byteLog::lastAsciiSel2()
+{
+    return lastAsciiSel2_;
 }
 
 int byteLog::ALNToBLN(int ALN) // ASCII Line Number to Byte Line Number
@@ -139,9 +172,18 @@ int byteLog::push(const unsigned char* data, int amt)
         size_ += amt - shifts * lineSize_; //пересчитываем размер
         free(data_); //удаляем старый массив
         data_ = tmp; //меняем на новый
-
-        //Считаем сдвиги по ASCII
-
+        if (firstSel_ >= 0)
+        {
+            firstSel_ -= shifts*lineSize_;
+            if (firstSel_ < 0)
+                firstSel_ = 0;
+        }
+        if (secondSel_ >= 0)
+        {
+            secondSel_ -= shifts*lineSize_;
+            if (secondSel_ < 0)
+                secondSel_ = 0;
+        }
         return shifts; //возвращаем число строк, на которые, в случае чего, требуется сдвинуть курсор
     }
 }
@@ -216,12 +258,12 @@ unsigned char* byteLog::asciiLine(int lineNum)
     size_t pos1 = 0, pos2 = 0;
     unsigned char* ret;
     int cnt = 0;
-    for (size_t i = 0; i < size_; i++)
+    for (int i = 0; i < size_; i++)
     {
         if ((data_[i] == '\n') || (i == size_-1))
         {
             pos1 = pos2;
-            pos2 = i;
+            pos2 = static_cast<size_t>(i);
             cnt++;
         }
         if (cnt == lineNum)
@@ -229,11 +271,74 @@ unsigned char* byteLog::asciiLine(int lineNum)
     }
     if (pos1 == pos2 || pos1 == pos2-1)
         return NULL;
+    if ((pos1 >= static_cast<size_t>(firstSel_) && pos2 <= static_cast<size_t>(firstSel_)) || (pos1 <= static_cast<size_t>(firstSel_) && pos2 >= static_cast<size_t>(firstSel_)))
+    {
+        lastAsciiSel1_ = firstSel_ - static_cast<int>(pos1);
+    }
+    else
+    {
+        lastAsciiSel1_ = -1;
+    }
+    if ((pos1 >= static_cast<size_t>(secondSel_) && pos2 <= static_cast<size_t>(secondSel_)) || (pos1 <= static_cast<size_t>(secondSel_) && pos2 >= static_cast<size_t>(secondSel_)))
+    {
+        lastAsciiSel2_ = secondSel_ - static_cast<int>(pos1);
+    }
+    else
+    {
+        lastAsciiSel2_ = -1;
+    }
     ret = static_cast<unsigned char*>(malloc(static_cast<size_t>(pos2-pos1)));
     memcpy(ret, data_+pos1+(pos1 == 0 ? 0:1), pos2-pos1);
     ret[pos2-pos1-1] = '\0';
 
     return ret;
+}
+
+int byteLog::asciiLineLen(int lineNum)
+{
+    size_t pos1 = 0, pos2 = 0;
+    int cnt = 0;
+    for (int i = 0; i < size_; i++)
+    {
+        if ((data_[i] == '\n') || (i == size_-1))
+        {
+            pos1 = pos2;
+            pos2 = static_cast<size_t>(i);
+            cnt++;
+        }
+        if (cnt == lineNum)
+            break;
+    }
+    return static_cast<int>(pos2-pos1);
+}
+
+int byteLog::getFirstSymInAsciiLine(int lineNum)
+{
+    if (lineNum == 0)
+        return -1;
+    size_t pos = 0;
+    int cnt = 0;
+    for (int i = 0; i < size_; i++)
+    {
+        if ((data_[i] == '\n') || (i == size_-1))
+        {
+            pos = static_cast<size_t>(i+1);
+            cnt++;
+        }
+        if (cnt == lineNum)
+            break;
+    }
+    return static_cast<int>(pos);
+}
+
+char* byteLog::getHighlighted()
+{
+    int op = min(firstSel_, secondSel_);
+    int ed = max(firstSel_, secondSel_)+1;
+    char* rt = static_cast<char*>(malloc(static_cast<size_t>(ed-op+1)*sizeof(char)));
+    memcpy(rt,data_+op, static_cast<size_t>(ed-op));
+    rt[ed-op] = '\0';
+    return rt;
 }
 
 int byteLog::linesAmt()

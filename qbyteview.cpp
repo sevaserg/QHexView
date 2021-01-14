@@ -5,8 +5,8 @@ using namespace std;
 QByteView::QByteView(QGroupBox *parent) : QGroupBox ( parent )//PointSys = 16, linesAmt = 10000, bytesInLine = 16
 {
     setMouseTracking(true);
-    chosenFirst = -1;
     chooseFirst = true;
+    enableHighlight = true;
     dispLines_ = 21;
     mainLayout = new QHBoxLayout;
     mainLayout->setMargin(0);
@@ -19,7 +19,6 @@ QByteView::QByteView(QGroupBox *parent) : QGroupBox ( parent )//PointSys = 16, l
     hscroller = new QScrollBar;
     scroller = new QScrollBar;
     scroller->setMaximum(0);
-    //connect(scroller, SIGNAL(sliderMoved(int)), this, SLOT(scrMoved(int)));
     connect(scroller, SIGNAL(valueChanged(int)), this, SLOT(scrMoved(int)));
     field->setVerticalScrollBar(vscroller);
     field->setHorizontalScrollBar(hscroller);
@@ -90,12 +89,36 @@ void QByteView::redraw()
         {
             if(log->linesAmt() * 20 > (scroller->value()+i)*20+j)
             {
+                int curElem = 20*(scroller->value()+i)+j;
                 QString str = "";
-                unsigned char info =((log->data()[20*(scroller->value()+i)+j]));
-                if (20*(scroller->value()+i)+j == chosenFirst)
+                unsigned char info =((log->data()[curElem]));
+                if (
+                    (
+                        (
+                            (curElem > min(log->firstSel(), log->secondSel()))
+                            &&
+                            (curElem < max(log->firstSel(), log->secondSel()))
+                        )
+                        &&
+                        (log->firstSel() >= 0 && log->secondSel() >= 0)
+                    )
+                    /*||
+                    (log->secondSel() < 0 && curElem == log->firstSel())*/
+
+                )
                 {
                     asciiMatrix[20*i+j].setBrush(QBrush(Qt::red));
                     matrix[20*i+j].setBrush(QBrush(Qt::red));
+                }
+                else if (curElem == log->firstSel())
+                {
+                    asciiMatrix[20*i+j].setBrush(QBrush(Qt::green));
+                    matrix[20*i+j].setBrush(QBrush(Qt::green));
+                }
+                else if (curElem == log->secondSel())
+                {
+                    asciiMatrix[20*i+j].setBrush(QBrush(Qt::darkCyan));
+                    matrix[20*i+j].setBrush(QBrush(Qt::darkCyan));
                 }
                 else
                 {
@@ -135,17 +158,20 @@ void QByteView::redraw()
 
 void QByteView::updateAscii()
 {
+    int shouldHighlight1 = -1;
+    int shouldHighlight2 = -1;
     field->clear();
     field->appendPlainText(QString::number(scroller->value()) + " / " + QString::number(log->asciiLines()) + ":\n\n");
 
     for(int i = 0; i < dispLines_; i++)
     {
         unsigned char*tmp = log->asciiLine(scroller->value()+i);
-
         QString str(reinterpret_cast<char *>(tmp));
         field->textCursor().movePosition(QTextCursor::End);
         field->textCursor().insertText(str);
         free(tmp);
+        if (log->lastAsciiSel1() >= 0)
+            shouldHighlight1 = log->lastAsciiSel1();
     }
     field->textCursor().deletePreviousChar();
 }
@@ -220,8 +246,10 @@ void QByteView::putData(const QByteArray & arr)
             scroller->setValue(scroller->maximum());
         else
            scroller->setValue((tmp2 <= shift ? 0 : tmp2-shift));
-        redraw();
-        updateAscii();
+        if (!isTextDisplayed_ && scroller->value() == scroller->maximum() && shifts == 0)
+            redraw();
+        if (isTextDisplayed_)
+            updateAscii();
 }
 
 void QByteView::putData(const QString & str)
@@ -314,13 +342,16 @@ void QByteView::switchViews()
             scroller->setMaximum(0);
         scroller->setMinimum(0);
         int byteLineNum = log->ALNToBLN(tempVal);
-        if (byteLineNum + dispLines_ < log->linesAmt())
+        if (scroller->value() != scroller->maximum())
         {
-            scroller->setValue(byteLineNum);
-        }
-        else
-        {
-            scroller->setValue(scroller->maximum());
+            if (byteLineNum + dispLines_ < log->linesAmt())
+            {
+                scroller->setValue(byteLineNum);
+            }
+            else
+            {
+                scroller->setValue(scroller->maximum());
+            }
         }
         field->hide();
         dataView->show();
@@ -335,19 +366,34 @@ void QByteView::switchViews()
             scroller->setMaximum(0);
         scroller->setMinimum(0);
         int asciiLineNum = log->BLNToALN(tempVal);
-        if (asciiLineNum + dispLines_ < log->asciiLines())
+        if (scroller->value() != scroller->maximum())
         {
-            scroller->setValue(asciiLineNum + 1);
-        }
-        else
-        {
-            scroller->setValue(scroller->maximum());
+            if (asciiLineNum + dispLines_ < log->asciiLines())
+            {
+                scroller->setValue(asciiLineNum + 1);
+            }
+            else
+            {
+                scroller->setValue(scroller->maximum());
+            }
         }
         dataView->hide();
         field->show();
         updateAscii();
     }
     isTextDisplayed_ = !isTextDisplayed_;
+}
+
+
+void QByteView::slotCopy()
+{
+    if (log->firstSel() >= 0 && log->secondSel() >= 0)
+    {
+        QClipboard* c = QApplication::clipboard();
+        char* tmp = log->getHighlighted();
+        c->setText(tmp);
+        free(tmp);
+    }
 }
 
 void QByteView::slotSwitchViews()
@@ -360,6 +406,35 @@ void QByteView::slotClear()
     clear();
 }
 
+void QByteView::slotChooseFirst()
+{
+    chooseFirst = true;
+}
+
+void QByteView::slotChooseSecond()
+{
+    chooseFirst = false;
+}
+
+void QByteView::slotScrDwn()
+{
+    scroller->setValue(scroller->maximum());
+}
+
+void QByteView::slotGoToHighlighted()
+{
+    int ln = min(log->firstSel(), log->secondSel()) / log->lineSize();
+    if (ln > scroller->maximum())
+        scroller->setValue(scroller->maximum());
+    else
+        scroller->setValue(ln);
+}
+
+void QByteView::slotEnableHighlighting()
+{
+    enableHighlight = !enableHighlight;
+}
+
 void QByteView::contextMenuEvent( QContextMenuEvent * e )
 {
     QMenu* pContextMenu = new QMenu( this);
@@ -367,22 +442,41 @@ void QByteView::contextMenuEvent( QContextMenuEvent * e )
     connect(pSwitchAction,SIGNAL(triggered()),this,SLOT(slotSwitchViews()));
     QAction *pClearAction = new QAction("Clear",this);
     connect(pClearAction ,SIGNAL(triggered()),this,SLOT(slotClear()));
-
-    QAction *pChooseFirst = new QAction("Choose First element",this);
-    connect(pChooseFirst ,SIGNAL(triggered()),this,SLOT(slotClear()));
-    pChooseFirst->setCheckable(true);
-    pChooseFirst->setChecked(chooseFirst);
-
-    QAction *pChooseSecond = new QAction("Choose second element",this);
-    connect(pChooseSecond ,SIGNAL(triggered()),this,SLOT(slotClear()));
-    pChooseSecond->setCheckable(true);
-    pChooseSecond->setChecked(!chooseFirst);
-    pChooseSecond->setEnabled(chosenFirst >= 0);
-
+    QAction *pScrDwnAction = new QAction("Scroll down",this);
+    connect(pScrDwnAction ,SIGNAL(triggered()),this,SLOT(slotScrDwn()));
     pContextMenu->addAction(pSwitchAction);
     pContextMenu->addAction(pClearAction);
-    pContextMenu->addAction(pChooseFirst);
-    pContextMenu->addAction(pChooseSecond);
+    if (!isTextDisplayed_)
+    {
+        pContextMenu->addSeparator();
+        QAction *pCopy = new QAction("Copy",this);
+        connect(pCopy ,SIGNAL(triggered()),this,SLOT(slotCopy()));
+        QAction *pEnableHighlighting = new QAction("Enable highlight editing",this);
+        connect(pEnableHighlighting ,SIGNAL(triggered()),this,SLOT(slotEnableHighlighting()));
+        pEnableHighlighting->setCheckable(true);
+        pEnableHighlighting->setChecked(enableHighlight);
+        QAction *pChooseFirst = new QAction("Choose green element",this);
+        connect(pChooseFirst ,SIGNAL(triggered()),this,SLOT(slotChooseFirst()));
+        pChooseFirst->setCheckable(true);
+        pChooseFirst->setChecked(chooseFirst);
+        pChooseFirst->setEnabled(enableHighlight);
+        QAction *pChooseSecond = new QAction("Choose cyan element",this);
+        connect(pChooseSecond ,SIGNAL(triggered()),this,SLOT(slotChooseSecond()));
+        pChooseSecond->setCheckable(true);
+        pChooseSecond->setChecked(!chooseFirst);
+        pChooseSecond->setEnabled(log->firstSel() >= 0 && enableHighlight);
+        pContextMenu->addAction(pCopy);
+        pContextMenu->addSeparator();
+        pContextMenu->addAction(pEnableHighlighting);
+        pContextMenu->addAction(pChooseFirst);
+        pContextMenu->addAction(pChooseSecond);
+        pContextMenu->addSeparator();
+        QAction *pGoToHighlighted = new QAction("Go to highlighted",this);
+        connect(pGoToHighlighted ,SIGNAL(triggered()),this,SLOT(slotGoToHighlighted()));
+        pContextMenu->addAction(pGoToHighlighted);
+        pContextMenu->addSeparator();
+    }
+    pContextMenu->addAction(pScrDwnAction);
     pContextMenu->exec(e->globalPos());
     delete pContextMenu;
 }
@@ -391,19 +485,26 @@ void QByteView::mousePressEvent(QMouseEvent *event)
 {
     if (event->buttons() == Qt::LeftButton)
     {
-        cout << "Button pressed! X = " << event->x() << ", Y = " << event->y() << endl;
         if (isTextDisplayed_)
         {
-
+            int rw = event->y() / 30 - 2;
+            int cl = event->x() / 30;
+            if (rw >= 0 && cl <= log->asciiLineLen(scroller->value() + rw))
+            {
+                cout << "Button pressed! X = " << event->x() << ", Y = " << event->y() << endl;
+                cout << "first element was chosen! Row " << event->y() / 30 - 2 <<
+                        ", column: " << event->x() / 30 << endl;
+                log->setFirstSel(log->getFirstSymInAsciiLine(scroller->value() + cl));
+            }
         }
         else
         {
-            if (event->pos().x() > 50 && event->pos().x() < 650)
+            if (event->pos().x() > 50 && event->pos().x() < 650 && enableHighlight)
             {
-                cout << "first element was chosen! Row " << (dataView->getHexX()-50) / 30 <<
-                        ", column: " << dataView->getHexY() / 20 << ", this is element #" <<
-                        (scroller->value() + dataView->getHexY() / 20) * 20 + (dataView->getHexX()-50) / 30 << endl;
-                chosenFirst = (scroller->value() + dataView->getHexY() / 20) * 20 + (dataView->getHexX()-50) / 30;
+                if (chooseFirst)
+                    log->setFirstSel(static_cast<int>((scroller->value() + dataView->getHexY() / 20) * 20 + (dataView->getHexX()-50) / 30));
+                else
+                    log->setSecondSel(static_cast<int>((scroller->value() + dataView->getHexY() / 20) * 20 + (dataView->getHexX()-50) / 30));
                 redraw();
             }
         }

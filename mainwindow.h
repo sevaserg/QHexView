@@ -13,14 +13,11 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = 0);
     ~MainWindow();
-
 private:
     QByteView *byteview_wgt;
     ComPortWgt *com_wgt;
-
 public slots:
     void read_from_com ( const QByteArray & );
-
 };
 
 #endif // MAINWINDOW_H
