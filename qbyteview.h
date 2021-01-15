@@ -55,6 +55,7 @@ protected:
     void mouseMoveEvent(QGraphicsSceneMouseEvent *event);
 
     void redraw();
+    void rewrite();
     void updateAscii();
     void resizeEvent(QResizeEvent*);
     void contextMenuEvent( QContextMenuEvent * e );

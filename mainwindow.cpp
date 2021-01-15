@@ -4,7 +4,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
     QVBoxLayout *main_lay = new QVBoxLayout;
 
-    com_wgt = new ComPortWgt( "COM7");
+    com_wgt = new ComPortWgt( "COM11");
     byteview_wgt = new QByteView;
 
     main_lay->addWidget( com_wgt );
