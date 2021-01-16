@@ -34,10 +34,9 @@ protected:
     QGraphicsScene* data;
     custGView* dataView;
     QGraphicsSimpleTextItem*num;
-    QGraphicsSimpleTextItem*matrix;
-    QGraphicsSimpleTextItem*asciiMatrix;
-    QFont f;
-
+    QGraphicsSimpleTextItem**matrix;
+    QGraphicsSimpleTextItem**asciiMatrix;
+    QFont fnt;
     bool isTextDisplayed_;
     bool enableHighlight;
     bool chooseFirst;
@@ -49,15 +48,22 @@ protected:
     int linesAmt_;
     int bytesInLine_;
     int shifts;
-
+    int lineSz;
     int dispLines_;
 
     void mouseMoveEvent(QGraphicsSceneMouseEvent *event);
 
     void redraw();
     void rewrite();
+
+    void redrawHex();
+    void rewriteHex();
+
+    void redrawAscii();
+    void rewriteAscii();
+
     void updateAscii();
-    void resizeEvent(QResizeEvent*);
+    void resizeEvent(QResizeEvent *e);
     void contextMenuEvent( QContextMenuEvent * e );
     void mousePressEvent(QMouseEvent *event);
     void setAsciiLines();

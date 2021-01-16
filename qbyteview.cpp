@@ -5,16 +5,18 @@ using namespace std;
 QByteView::QByteView(QGroupBox *parent) : QGroupBox ( parent )//PointSys = 16, linesAmt = 10000, bytesInLine = 16
 {
     setMouseTracking(true);
+
+
+    fnt.setFamily("Courier New");
+    fnt.setPixelSize(11);
+
     chooseFirst = true;
     enableHighlight = true;
-    dispLines_ = 21;
+    dispLines_ = 36;
     mainLayout = new QHBoxLayout;
     mainLayout->setMargin(0);
     log = new byteLog;
     field = new QPlainTextEdit;
-    f.setFamily("Courier New");
-    f.setPointSize(20);
-    field->setFont(f);
     vscroller = new QScrollBar;
     hscroller = new QScrollBar;
     scroller = new QScrollBar;
@@ -31,11 +33,11 @@ QByteView::QByteView(QGroupBox *parent) : QGroupBox ( parent )//PointSys = 16, l
     dataView->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     dataView->setScene(data);
     dataView->initRect();
-    dataView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
-    dataView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+    dataView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    dataView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     dataView->setMouseTracking(true);
     pointSys_ = 16;
-    linesAmt_ = 20000;
+    linesAmt_ = 2000;
     bytesInLine_ = 20;
     log->setMax(linesAmt_, bytesInLine_);
     setByteLines();
@@ -45,17 +47,22 @@ QByteView::QByteView(QGroupBox *parent) : QGroupBox ( parent )//PointSys = 16, l
     shifts = 0;
     mainLayout->addWidget(field);
     mainLayout->addWidget(dataView);
-    dataView->hide();
+    field->hide();
     isTextDisplayed_ = true;
     mainLayout->addWidget(scroller);
     this->setLayout(mainLayout);
-    this->show();
     dataView->printRects();
     num = new QGraphicsSimpleTextItem[dispLines_];
-    asciiMatrix = new QGraphicsSimpleTextItem[20*dispLines_];
-    matrix = new QGraphicsSimpleTextItem[20*dispLines_];
+    asciiMatrix = new QGraphicsSimpleTextItem*[dispLines_];
+    matrix = new QGraphicsSimpleTextItem*[dispLines_];
+    for (int i = 0; i < dispLines_; i++)
+    {
+        asciiMatrix[i] = new QGraphicsSimpleTextItem[20];
+        matrix[i] = new QGraphicsSimpleTextItem[20];
+    }
     redraw();
-    rewrite();
+    //rewrite();
+    this->show();
 }
 
 bool QByteView::isTextDisplayed()
@@ -68,7 +75,7 @@ inline int QByteView::symsInPS()
     return (pointSys_ >= 16 ? 2 : pointSys_ >= 8 ? 4 : pointSys_ >= 4 ? 6 : 8);
 }
 
-void QByteView::rewrite()
+void QByteView::rewriteHex()
 {
     char alphabet[16] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
     for (int i = 0; i < dispLines_; i++)
@@ -91,61 +98,72 @@ void QByteView::rewrite()
                         &&
                         (log->firstSel() >= 0 && log->secondSel() >= 0)
                     )
-                    /*||
-                    (log->secondSel() < 0 && curElem == log->firstSel())*/
-
                 )
                 {
-                    asciiMatrix[20*i+j].setBrush(QBrush(Qt::red));
-                    matrix[20*i+j].setBrush(QBrush(Qt::red));
+                    asciiMatrix[i][j].setBrush(QBrush(Qt::red));
+                    matrix[i][j].setBrush(QBrush(Qt::red));
                 }
                 else if (curElem == log->firstSel())
                 {
-                    asciiMatrix[20*i+j].setBrush(QBrush(Qt::green));
-                    matrix[20*i+j].setBrush(QBrush(Qt::green));
+                    asciiMatrix[i][j].setBrush(QBrush(Qt::green));
+                    matrix[i][j].setBrush(QBrush(Qt::green));
                 }
                 else if (curElem == log->secondSel())
                 {
-                    asciiMatrix[20*i+j].setBrush(QBrush(Qt::darkCyan));
-                    matrix[20*i+j].setBrush(QBrush(Qt::darkCyan));
+                    asciiMatrix[i][j].setBrush(QBrush(Qt::darkCyan));
+                    matrix[i][j].setBrush(QBrush(Qt::darkCyan));
                 }
                 else
                 {
-                    asciiMatrix[20*i+j].setBrush(QBrush(Qt::black));
-                    matrix[20*i+j].setBrush(QBrush(Qt::black));
+                    asciiMatrix[i][j].setBrush(QBrush(Qt::black));
+                    matrix[i][j].setBrush(QBrush(Qt::black));
 
                 }
                 if (info >= 32 && info < 127)
-                    asciiMatrix[20*i+j].setText(QString(info));
+                    asciiMatrix[i][j].setText(QString(info));
                 else
-                    asciiMatrix[20*i+j].setText(".");
+                    asciiMatrix[i][j].setText(".");
                 for (int i = 0; i < symsInPS();i++)
                 {
                     str = alphabet[info%pointSys_]+str;
                     info /= pointSys_;
                 }
-                matrix[20*i+j].setText(str);
+                matrix[i][j].setText(str);
             }
             else
             {
-                asciiMatrix[20*i+j].setText("?");
-                matrix[20*i+j].setText("??");
+                asciiMatrix[i][j].setText("?");
+                matrix[i][j].setText("??");
             }
         }
     }
 }
 
-void QByteView::redraw()
+void QByteView::redrawHex()
 {
-    delete[]asciiMatrix;
+    for (int i = 0; i < dispLines_; i++)
+    {
+        delete[]asciiMatrix[i];
+        delete[]matrix[i];
+    }
     delete[]matrix;
+    delete[]asciiMatrix;
     delete[]num;
     dataView->clear();
+    data->clear();
+    dataView->switchViews(false);
     int offset = 650, strOffset = 50;
+    lineSz = 20;
+    dispLines_ = this->width()/20;
     dataView->resize();
     num = new QGraphicsSimpleTextItem[dispLines_];
-    asciiMatrix = new QGraphicsSimpleTextItem[20*dispLines_];
-    matrix = new QGraphicsSimpleTextItem[20*dispLines_];
+    asciiMatrix = new QGraphicsSimpleTextItem*[dispLines_];
+    matrix = new QGraphicsSimpleTextItem*[dispLines_];
+    for (int i = 0; i < dispLines_; i++)
+    {
+        asciiMatrix[i] = new QGraphicsSimpleTextItem[20];
+        matrix[i] = new QGraphicsSimpleTextItem[20];
+    }
     for (int i = 0; i < dispLines_; i++)
     {
         num[i].setText(QString::number(scroller->value()+i+1));
@@ -153,17 +171,114 @@ void QByteView::redraw()
         num[i].moveBy(5, 20*i);
         for (int j = 0; j < 320 / pointSys_; j++)
         {
-            data->addItem(&matrix[20*i+j]);
-            data->addItem(&asciiMatrix[20*i+j]);
-            matrix[20*i+j].moveBy(strOffset+5+30*j, 20*i);
-            asciiMatrix[20*i+j].moveBy(offset+5+7*j, 20*i);
+            matrix[i][j].setFont(fnt);
+            data->addItem(&matrix[i][j]);
+            data->addItem(&asciiMatrix[i][j]);
+            matrix[i][j].moveBy(strOffset+5+30*j, 20*i);
+            asciiMatrix[i][j].moveBy(offset+5+7*j, 20*i);
         }
     }
+    dataView->initRect();
     dataView->printRects();
     data->addLine(strOffset, 0, strOffset,dataView->height() - 20);
     data->addLine(0, 0, 0,dataView->height() - 20);
     data->addLine(offset, 0, offset,dataView->height() - 20);
     data->addLine(offset+1, 0, offset+1,dataView->height() - 20);
+    rewriteHex();
+}
+
+void QByteView::rewriteAscii()
+{
+    for (int i = 0; i < dispLines_; i++)
+    {
+        num[i].setText(QString::number(scroller->value()+i+1));
+        unsigned char* ln = log->asciiLine(scroller->value()+i+1);
+        QString d = QString(reinterpret_cast<char*>(ln));
+        for (int j = 0; j < lineSz; j++)
+        {
+            if (j < d.length())
+                asciiMatrix[i][j].setText(d.at(j));
+            else
+                asciiMatrix[i][j].setText("M");
+        }
+        free(ln);
+    }
+}
+
+void QByteView::redrawAscii()
+{
+    for (int i = 0; i < dispLines_; i++)
+    {
+        cout << i<<": "<<matrix[i][0].text().toStdString()<<endl;
+        delete[]asciiMatrix[i];
+        delete[]matrix[i];
+    }
+    delete[]asciiMatrix;
+    delete[]matrix;
+    delete[]num;
+    dataView->clear();
+    data->clear();
+    dataView->switchViews(true);
+    lineSz = this->width()/8;
+    dispLines_ = this->width()/20;
+    int strOffset = 50;
+    dataView->resize();
+    num = new QGraphicsSimpleTextItem[dispLines_];
+    asciiMatrix = new QGraphicsSimpleTextItem*[dispLines_];
+    matrix = new QGraphicsSimpleTextItem*[dispLines_];
+    for (int i = 0; i < dispLines_; i++)
+    {
+            asciiMatrix[i] = new QGraphicsSimpleTextItem[lineSz];
+            matrix[i] = new QGraphicsSimpleTextItem[1];
+    }
+
+    for (int i = 0; i < dispLines_; i++)
+    {
+        num[i].setText(QString::number(scroller->value()+i+1));
+        data->addItem(&num[i]);
+        num[i].moveBy(5, 20*i);
+        for (int j = 0; j < lineSz;j++)
+        {
+            data->addItem(&asciiMatrix[i][j]);
+            asciiMatrix[i][j].moveBy(strOffset+8*(j+1), 20*i);
+        }
+    }
+    data->addLine(strOffset, 0, strOffset,dataView->height() - 20);
+    dataView->initRect();
+    dataView->printRects();
+    rewriteAscii();
+}
+
+void QByteView::rewrite()
+{
+    if (isTextDisplayed_)
+        rewriteAscii();
+    else
+        rewriteHex();
+}
+
+void QByteView::redraw()
+{
+    if (isTextDisplayed_)
+        redrawAscii();
+    else
+        redrawHex();
+    /*for (int i = 0; i < dispLines_; i++)
+    {
+        if (!isTextDisplayed_)
+        {
+            for (int j = 0; j < bytesInLine_;j++)
+            {
+                asciiMatrix[i*bytesInLine_+j].setFont(fnt);
+                matrix[i*bytesInLine_+j].setFont(fnt);
+            }
+        }
+        else
+        {
+            asciiMatrix[i].setFont(fnt);
+        }
+        num[i].setFont(fnt);
+    }*/
 }
 
 void QByteView::updateAscii()
@@ -238,13 +353,13 @@ void QByteView::putData(const QByteArray & arr)
         bool isMax = scroller->value() == scroller->maximum();
         int shift =log->push(reinterpret_cast<const unsigned char *>(arr.data()), arr.size());
         int newMaxLines;
-        if (field->isHidden())
+        if (!isTextDisplayed_)
             newMaxLines = log->linesAmt()-dispLines_;
         else
             newMaxLines = log->asciiLines()-dispLines_;
         int tmp2 = scroller->value();
         scroller->setMaximum(newMaxLines <= 0 ? 0 : newMaxLines);
-        if (field->isHidden())
+        if (!isTextDisplayed_)
         {
             log->asciiShift();
         }
@@ -281,6 +396,11 @@ QString QByteView::getQString()
 QByteView::~QByteView()
 {
     free(buf_);
+    for (int i = 0; i < dispLines_; i++)
+    {
+        delete[]asciiMatrix[i];
+        delete[]matrix[i];
+    }
     delete[]matrix;
     delete[]asciiMatrix;
     delete[]num;
@@ -335,8 +455,7 @@ void QByteView::scrMoved(int val)
 
 void QByteView::resizeEvent(QResizeEvent*)
 {
-    setByteLines();
-    updateAscii();
+    redraw();
 }
 
 void QByteView::switchViews()
@@ -344,7 +463,6 @@ void QByteView::switchViews()
     int tempVal = scroller->value();
     if (isTextDisplayed_)
     {
-        dispLines_ = 36;
         if (log->linesAmt() - dispLines_ >= 0)
             scroller->setMaximum(log->linesAmt() - dispLines_);
         else
@@ -364,11 +482,9 @@ void QByteView::switchViews()
         }
         field->hide();
         dataView->show();
-        redraw();
     }
     else
     {
-        dispLines_ = 21;
         if (log->asciiLines() - dispLines_ >= 0)
             scroller->setMaximum(log->asciiLines() - dispLines_);
         else
@@ -390,9 +506,12 @@ void QByteView::switchViews()
         field->show();
         updateAscii();
     }
+    field->hide();
+    dataView->show();
     isTextDisplayed_ = !isTextDisplayed_;
+    redraw();
+    rewrite();
 }
-
 
 void QByteView::slotCopy()
 {
@@ -519,3 +638,4 @@ void QByteView::mousePressEvent(QMouseEvent *event)
         }
     }
 }
+

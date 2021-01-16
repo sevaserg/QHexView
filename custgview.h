@@ -12,12 +12,14 @@
 class custGView : public QGraphicsView
 {
 private:
-    QGraphicsRectItem* colChoice, *colChoice2, *tabChoice, *hexChoice, *asciiChoice;
-public:
+    bool isTextDisplayed_;
     int col[2];
     int col2[2];
     int tab[2];
+    QGraphicsRectItem* colChoice, *colChoice2, *tabChoice, *hexChoice, *asciiChoice;
+public:
     custGView();
+    void switchViews(bool val);
     void clear();
     void initRect();
     void resize();
