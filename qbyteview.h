@@ -18,6 +18,8 @@
 #include <QClipboard>
 #include <QGroupBox>
 #include <QShortcut>
+#include <QDateTime>
+#include <QTextStream>
 #include "bytelog.h"
 #include "custgview.h"
 
@@ -27,7 +29,6 @@ Q_OBJECT
 private:
 
 protected:
-    inline int symsInPS();
     QScrollBar  *hscroller, *vscroller, *scroller;
     QHBoxLayout* mainLayout;
     QPlainTextEdit* field;
@@ -51,8 +52,6 @@ protected:
     int lineSz;
     int dispLines_;
 
-    void mouseMoveEvent(QGraphicsSceneMouseEvent *event);
-
     void redraw();
     void rewrite();
 
@@ -62,14 +61,11 @@ protected:
     void redrawAscii();
     void rewriteAscii();
 
-    void updateAscii();
     void resizeEvent(QResizeEvent *e);
     void contextMenuEvent( QContextMenuEvent * e );
     void mousePressEvent(QMouseEvent *event);
-    void setAsciiLines();
-    void setByteLines();
 public:
-    QByteView(QGroupBox *parent = 0); //PointSys = 16, linesAmt = 10000, bytesInLine = 20
+    QByteView(QGroupBox *parent = 0);
 
 //================================================================
 //================================================================
@@ -86,35 +82,21 @@ public:
      * или false - если выведено байтовое представление.
      */
 
-    void setMaxLines(int maxLines, int bytesInLine_);
-    /*
-     * Настраивает кол-во элементов для байтового представления.
-     */
-
-    bool setPS(int ps);
-    /*
-     * выбор системы счисления (2 двоичная, 4 четвертичная,
-     * 8 восьмеричная и 16 шестнадцатеричная) байтового
-     * представления.
-     * ПОКА НЕ РЕАЛИЗОВАНО!
-     */
-
-    void clear();
-    /*
-     * Очищает лог.
-     */
-
     bool isRawDisplayed();
     /*
      * Вернёт true, если выведено байтовое представление,
      * или false - если выведено текстовое представление.
      */
 
-    int pointSys();
+    void setMaxLines(int maxLines, int bytesInLine_ = 20);
     /*
-     * Вернёт выбранную систему счисления (2 двоичная, 4 четвертичная,
-     * 8 восьмеричная и 16 шестнадцатеричная) байтового
-     * представления.
+     * Настраивает кол-во элементов для байтового представления.
+     * bytesInLine_ лучше пока не менять.
+     */
+
+    void clear();
+    /*
+     * Очищает лог.
      */
 
     int linesAmt();
@@ -130,15 +112,13 @@ public:
 
     void putData(const QByteArray & arr);
     /*
-     * кладёт данные в лог.
+     * Кладёт данные в лог.
      */
 
     void putData(const QString & str);
     /*
-     * кладёт данные в лог.
+     * Кладёт данные в лог.
      */
-
-    //unsigned char* getC();
 
     QByteArray getQByteArray();
     /*
@@ -150,6 +130,19 @@ public:
      * Возвращает данные из лога в виде QString.
      */
 
+    void exportSelected(int first = -1, int last = -1);
+    /*
+     * Экспортирует выделенное в файл.
+     * Структура названия: log-t-час-минута-секунда-d-день-месяц-год.txt
+     * Пример: log-t-14-47-11-d-18-01-2021.txt
+     * Выделено всё - экспортирует всё.
+     * Не выделено ничего - не экспортируется ничего.
+     * Если first или last будут меньше нуля, значение будет браться
+     * по указателям из лога. Если в логе при этом значение
+     * одной из двух меток будет меньше нуля,
+     * не экспортируется ничего.
+     *
+     */
 //================================================================
 //================================================================
 
@@ -165,6 +158,8 @@ protected slots:
     void slotScrDwn();
     void slotGoToHighlighted();
     void slotEnableHighlighting();
+    void slotExportSelected();
+    void slotSelectAll();
 };
 
 

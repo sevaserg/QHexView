@@ -4,6 +4,7 @@
 class byteLog
 {
 private:
+    bool selectAll_;
     unsigned char* data_;
     unsigned char* buffer;
     int firstSel_;
@@ -13,8 +14,8 @@ private:
     int size_;
     int maximum_;
     int asciiShift_;
-    int lastAsciiSel1_;
-    int lastAsciiSel2_;
+    int *asciiSel1_;
+    int *asciiSel2_;
 public:
     byteLog();
     int size();
@@ -28,8 +29,15 @@ public:
     void setSecondSel(int num);
     int firstSel();
     int secondSel();
-    int lastAsciiSel1();
-    int lastAsciiSel2();
+    int asciiSel1Line();
+    int asciiSel2Line();
+    int asciiSel1Sym();
+    int asciiSel2Sym();
+    int asciiSel1Active();
+    int asciiSel2Active();
+    void redoAsciiChoice(int sel, int *asel);
+    void setSelectAll(bool sel);
+    bool selectAll();
     int ALNToBLN(int ALN);
     int BLNToALN(int BLN);
     void push(unsigned char data);
@@ -41,6 +49,7 @@ public:
     unsigned char* data();
     unsigned char at(int pos);
     unsigned char* toText(int ps);
+    char* getData(int first, int last);
     int linesAmt();
     int asciiLines();
     int getFirstSymInAsciiLine(int lineNum);

@@ -10,13 +10,18 @@ using namespace std;
 
 byteLog::byteLog()
 {
+    selectAll_ = false;
     lineSize_ = 20;
-    maximum_ = 200000;
+    maximum_ = 75000;
     this->data_ = static_cast<unsigned char*>(malloc(0));
     this->size_ = 0;
     asciiShift_ = 0;
     firstSel_ = -1;
     secondSel_ = -1;
+    asciiSel1_ = new int[3];
+    asciiSel2_ = new int[3];
+    asciiSel1_[0] = -1;
+    asciiSel2_[0] = -1;
 }
 
 int byteLog::size()
@@ -83,11 +88,13 @@ void byteLog::push(unsigned char data)
 void byteLog::setFirstSel(int num)
 {
     firstSel_ = num;
+    redoAsciiChoice(firstSel_, asciiSel1_);
 }
 
 void byteLog::setSecondSel(int num)
 {
     secondSel_ = num;
+    redoAsciiChoice(secondSel_, asciiSel2_);
 }
 
 int byteLog::firstSel()
@@ -100,14 +107,69 @@ int byteLog::secondSel()
     return secondSel_;
 }
 
-int byteLog::lastAsciiSel1()
+int byteLog::asciiSel1Line()
 {
-    return lastAsciiSel1_;
+    return asciiSel1_[1];
 }
 
-int byteLog::lastAsciiSel2()
+int byteLog::asciiSel2Line()
 {
-    return lastAsciiSel2_;
+    return asciiSel2_[1];
+}
+
+int byteLog::asciiSel1Sym()
+{
+    return asciiSel1_[2];
+}
+
+int byteLog::asciiSel2Sym()
+{
+    return asciiSel2_[2];
+}
+
+int byteLog::asciiSel1Active()
+{
+    return asciiSel1_[0];
+}
+
+int byteLog::asciiSel2Active()
+{
+    return asciiSel2_[0];
+}
+
+void byteLog::redoAsciiChoice(int sel, int *asel)
+{
+    int line = 0, sym = 0, avail = 0;
+    if (sel < 0)
+    {
+        avail = -1;
+    }
+    else
+    {
+        for (int i = 0; i < sel; i++)
+        {
+            sym++;
+            if (data_[i] == '\n')
+            {
+                line++;
+                sym = 0;
+            }
+        }
+    }
+    asel[0] = avail;
+    asel[1] = line;
+    asel[2] = sym;
+    cout << "Line " << asel[1] <<", symbol " << asel[2] << (asel[0] < 0 ? ", not available" : ", available") << endl;
+}
+
+void byteLog::setSelectAll(bool sel)
+{
+    selectAll_ = sel;
+}
+
+bool byteLog::selectAll()
+{
+    return selectAll_;
 }
 
 int byteLog::ALNToBLN(int ALN) // ASCII Line Number to Byte Line Number
@@ -172,17 +234,25 @@ int byteLog::push(const unsigned char* data, int amt)
         size_ += amt - shifts * lineSize_; //пересчитываем размер
         free(data_); //удаляем старый массив
         data_ = tmp; //меняем на новый
-        if (firstSel_ >= 0)
+        if (selectAll_)
         {
-            firstSel_ -= shifts*lineSize_;
-            if (firstSel_ < 0)
-                firstSel_ = 0;
+            firstSel_ = 0;
+            secondSel_ = size_-1;
         }
-        if (secondSel_ >= 0)
+        else
         {
-            secondSel_ -= shifts*lineSize_;
-            if (secondSel_ < 0)
-                secondSel_ = 0;
+            if (firstSel_ >= 0)
+            {
+                firstSel_ -= shifts*lineSize_;
+                if (firstSel_ < 0)
+                    firstSel_ = 0;
+            }
+            if (secondSel_ >= 0)
+            {
+                secondSel_ -= shifts*lineSize_;
+                if (secondSel_ < 0)
+                    secondSel_ = 0;
+            }
         }
         return shifts; //возвращаем число строк, на которые, в случае чего, требуется сдвинуть курсор
     }
@@ -219,29 +289,8 @@ unsigned char* byteLog::data()
 unsigned char byteLog::at(int pos)
 {
     if (pos < 0 || pos >= size_)
-        return NULL;
+        return '\0';
     return data_[pos];
-}
-
-unsigned char* byteLog::toText(int ps)
-{
-    unsigned char alphabet[16] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
-    //if (ps == 0)
-    {
-        unsigned char* tmp = static_cast<unsigned char *>(malloc((static_cast<size_t>(size_ + lines_ ))));
-        for(int i = 0; i < lines_; i++)
-        {
-            memcpy(tmp+i*(lineSize_+1),data_+i*lineSize_,static_cast<size_t>(lineSize_));
-            for (int j = i*lineSize_-1; j < ( i != lines_-1 ? (i+1)*lineSize_ : i + size_%lineSize_); j++)
-            {
-                if (tmp[j] >= 126 && tmp[j] < 30)
-                    tmp[j] = '.';
-            }
-            tmp[lineSize_*i] = '\n';
-        }
-        tmp = static_cast<unsigned char *>(realloc(tmp, static_cast<size_t>(size_ + lines_ -1)));
-        return tmp;
-    }
 }
 
 int byteLog::asciiLines()
@@ -255,8 +304,15 @@ int byteLog::asciiLines()
 
 unsigned char* byteLog::asciiLine(int lineNum)
 {
+
     size_t pos1 = 0, pos2 = 0;
     unsigned char* ret;
+    if (lineNum >= asciiLines())
+    {
+        ret = static_cast<unsigned char*>(malloc(1));
+        ret[0] = '\0';
+        return ret;
+    }
     int cnt = 0;
     for (int i = 0; i < size_; i++)
     {
@@ -270,22 +326,10 @@ unsigned char* byteLog::asciiLine(int lineNum)
             break;
     }
     if (pos1 == pos2 || pos1 == pos2-1)
-        return NULL;
-    if ((pos1 >= static_cast<size_t>(firstSel_) && pos2 <= static_cast<size_t>(firstSel_)) || (pos1 <= static_cast<size_t>(firstSel_) && pos2 >= static_cast<size_t>(firstSel_)))
     {
-        lastAsciiSel1_ = firstSel_ - static_cast<int>(pos1);
-    }
-    else
-    {
-        lastAsciiSel1_ = -1;
-    }
-    if ((pos1 >= static_cast<size_t>(secondSel_) && pos2 <= static_cast<size_t>(secondSel_)) || (pos1 <= static_cast<size_t>(secondSel_) && pos2 >= static_cast<size_t>(secondSel_)))
-    {
-        lastAsciiSel2_ = secondSel_ - static_cast<int>(pos1);
-    }
-    else
-    {
-        lastAsciiSel2_ = -1;
+        ret = static_cast<unsigned char*>(malloc(1));
+        ret[0] = '\0';
+        return ret;
     }
     ret = static_cast<unsigned char*>(malloc(static_cast<size_t>(pos2-pos1)));
     memcpy(ret, data_+pos1+(pos1 == 0 ? 0:1), pos2-pos1);
@@ -341,6 +385,16 @@ char* byteLog::getHighlighted()
     return rt;
 }
 
+char* byteLog::getData(int first, int last)
+{
+    int op = min(first, size_);
+    int ed = min(last, size_)+1;
+    char* rt = static_cast<char*>(malloc(static_cast<size_t>(ed-op+1)*sizeof(char)));
+    memcpy(rt,data_+op, static_cast<size_t>(ed-op));
+    rt[ed-op] = '\0';
+    return rt;
+}
+
 int byteLog::linesAmt()
 {
     return size_ / lineSize_;
@@ -360,5 +414,7 @@ int byteLog::asciiShift()
 
 byteLog::~byteLog()
 {
+    delete[]asciiSel1_;
+    delete[]asciiSel2_;
     free(data_);
 }

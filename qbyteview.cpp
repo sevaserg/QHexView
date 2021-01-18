@@ -40,7 +40,6 @@ QByteView::QByteView(QGroupBox *parent) : QGroupBox ( parent )//PointSys = 16, l
     linesAmt_ = 2000;
     bytesInLine_ = 20;
     log->setMax(linesAmt_, bytesInLine_);
-    setByteLines();
     connect(this, SIGNAL(customContextMenuRequested(const QPoint &)),
             this, SLOT(ShowContextMenu(const QPoint &)));
     buf_ = static_cast<unsigned char *>(malloc(0));
@@ -68,11 +67,6 @@ QByteView::QByteView(QGroupBox *parent) : QGroupBox ( parent )//PointSys = 16, l
 bool QByteView::isTextDisplayed()
 {
     return isTextDisplayed_;
-}
-
-inline int QByteView::symsInPS()
-{
-    return (pointSys_ >= 16 ? 2 : pointSys_ >= 8 ? 4 : pointSys_ >= 4 ? 6 : 8);
 }
 
 void QByteView::rewriteHex()
@@ -110,8 +104,8 @@ void QByteView::rewriteHex()
                 }
                 else if (curElem == log->secondSel())
                 {
-                    asciiMatrix[i][j].setBrush(QBrush(Qt::darkCyan));
-                    matrix[i][j].setBrush(QBrush(Qt::darkCyan));
+                    asciiMatrix[i][j].setBrush(QBrush(Qt::cyan));
+                    matrix[i][j].setBrush(QBrush(Qt::cyan));
                 }
                 else
                 {
@@ -123,7 +117,7 @@ void QByteView::rewriteHex()
                     asciiMatrix[i][j].setText(QString(info));
                 else
                     asciiMatrix[i][j].setText(".");
-                for (int i = 0; i < symsInPS();i++)
+                for (int i = 0; i < 2;i++)
                 {
                     str = alphabet[info%pointSys_]+str;
                     info /= pointSys_;
@@ -154,7 +148,7 @@ void QByteView::redrawHex()
     dataView->switchViews(false);
     int offset = 650, strOffset = 50;
     lineSz = 20;
-    dispLines_ = this->width()/20;
+    dispLines_ = this->height()/20;
     dataView->resize();
     num = new QGraphicsSimpleTextItem[dispLines_];
     asciiMatrix = new QGraphicsSimpleTextItem*[dispLines_];
@@ -197,10 +191,79 @@ void QByteView::rewriteAscii()
         for (int j = 0; j < lineSz; j++)
         {
             if (j < d.length())
+            {
+                asciiMatrix[i][j].setBrush(QBrush(Qt::black));
                 asciiMatrix[i][j].setText(d.at(j));
+                if (log->asciiSel1Active() >= 0 && log->asciiSel2Active() >= 0)
+                {
+                    cout << "Current " << scroller->value() + i << ", left "  << log->asciiSel1Line() << ", right " << log->asciiSel2Line() << endl;
+                    if((scroller->value() + i  > log->asciiSel1Line() && scroller->value() + i  < log->asciiSel2Line()) || (scroller->value() + i  > log->asciiSel2Line() && scroller->value() + i  < log->asciiSel1Line()))
+                    {
+                        asciiMatrix[i][j].setBrush(QBrush(Qt::red));
+                    }
+                    if (log->asciiSel1Line() < log->asciiSel2Line())
+                    {
+                        if (scroller->value() + i  == log->asciiSel1Line())
+                        {
+                            if (j > log->asciiSel1Sym())
+                                asciiMatrix[i][j].setBrush(QBrush(Qt::red));
+                        }
+                        if (scroller->value() + i  == log->asciiSel2Line())
+                        {
+                            if (j < log->asciiSel2Sym())
+                                asciiMatrix[i][j].setBrush(QBrush(Qt::red));
+                        }
+                    }
+                    if (log->asciiSel1Line() > log->asciiSel2Line())
+                    {
+                        if (scroller->value() + i  == log->asciiSel1Line())
+                        {
+                            if (j < log->asciiSel1Sym())
+                                asciiMatrix[i][j].setBrush(QBrush(Qt::red));
+                        }
+                        if (scroller->value() + i  == log->asciiSel2Line())
+                        {
+                            if (j > log->asciiSel2Sym())
+                                asciiMatrix[i][j].setBrush(QBrush(Qt::red));
+                        }
+                    }
+                    if (log->asciiSel1Line() == log->asciiSel2Line())
+                    {
+                        if (scroller->value() + i  == log->asciiSel1Line())
+                        {
+                            if (log->asciiSel1Sym() < log->asciiSel2Sym())
+                            {
+                                if (j > log->asciiSel1Sym() && j < log->asciiSel2Sym())
+                                    asciiMatrix[i][j].setBrush(QBrush(Qt::red));
+                            }
+                            if (log->asciiSel1Sym() > log->asciiSel2Sym())
+                            {
+                                if (j < log->asciiSel1Sym() && j > log->asciiSel2Sym())
+                                    asciiMatrix[i][j].setBrush(QBrush(Qt::red));
+                            }
+                        }
+                    }
+                }
+                if (log->asciiSel1Active() >= 0)
+                {
+                    if (scroller->value() + i == log->asciiSel1Line() && j == log->asciiSel1Sym())
+                    {
+                        asciiMatrix[i][j].setBrush(QBrush(Qt::green));
+                    }
+                }
+                if (log->asciiSel2Active() >= 0)
+                {
+                    if (scroller->value() + i == log->asciiSel2Line() && j == log->asciiSel2Sym())
+                    {
+                        asciiMatrix[i][j].setBrush(QBrush(Qt::cyan));
+                    }
+                }
+
+            }
             else
-                asciiMatrix[i][j].setText("M");
-        }
+                asciiMatrix[i][j].setText("");
+            }
+
         free(ln);
     }
 }
@@ -209,7 +272,6 @@ void QByteView::redrawAscii()
 {
     for (int i = 0; i < dispLines_; i++)
     {
-        cout << i<<": "<<matrix[i][0].text().toStdString()<<endl;
         delete[]asciiMatrix[i];
         delete[]matrix[i];
     }
@@ -220,7 +282,7 @@ void QByteView::redrawAscii()
     data->clear();
     dataView->switchViews(true);
     lineSz = this->width()/8;
-    dispLines_ = this->width()/20;
+    dispLines_ = this->height()/20;
     int strOffset = 50;
     dataView->resize();
     num = new QGraphicsSimpleTextItem[dispLines_];
@@ -263,42 +325,48 @@ void QByteView::redraw()
         redrawAscii();
     else
         redrawHex();
-    /*for (int i = 0; i < dispLines_; i++)
-    {
-        if (!isTextDisplayed_)
-        {
-            for (int j = 0; j < bytesInLine_;j++)
-            {
-                asciiMatrix[i*bytesInLine_+j].setFont(fnt);
-                matrix[i*bytesInLine_+j].setFont(fnt);
-            }
-        }
-        else
-        {
-            asciiMatrix[i].setFont(fnt);
-        }
-        num[i].setFont(fnt);
-    }*/
 }
 
-void QByteView::updateAscii()
+void QByteView::exportSelected(int first, int last)
 {
-    int shouldHighlight1 = -1;
-    int shouldHighlight2 = -1;
-    field->clear();
-    field->appendPlainText(QString::number(scroller->value()) + " / " + QString::number(log->asciiLines()) + ":\n\n");
-
-    for(int i = 0; i < dispLines_; i++)
+    int firstData, lastData;
+    QDateTime dt = QDateTime::currentDateTime();
+    QString yr = QString::number(dt.date().year());
+    QString mn = QString::number(dt.date().month() / 10)+QString::number(dt.date().month() % 10);
+    QString dy = QString::number(dt.date().day() / 10)+QString::number(dt.date().day() % 10);
+    QString hr = QString::number(dt.time().hour() / 10)+QString::number(dt.time().hour() % 10);
+    QString mt = QString::number(dt.time().minute() / 10)+QString::number(dt.time().minute() % 10);
+    QString sc = QString::number(dt.time().second() / 10)+QString::number(dt.time().second() % 10);
+    QString res = "log-t-" + hr + "-" + mt + "-" + sc + "-d-" + dy + "-" + mn + "-" + yr + ".txt";
+    if (first < 0 && last < 0)
     {
-        unsigned char*tmp = log->asciiLine(scroller->value()+i);
-        QString str(reinterpret_cast<char *>(tmp));
-        field->textCursor().movePosition(QTextCursor::End);
-        field->textCursor().insertText(str);
-        free(tmp);
-        if (log->lastAsciiSel1() >= 0)
-            shouldHighlight1 = log->lastAsciiSel1();
+        firstData = min(log->firstSel(), log->secondSel());
+        lastData = max(log->firstSel(), log->secondSel());
     }
-    field->textCursor().deletePreviousChar();
+    else
+    {
+        firstData = min(first, last);
+        lastData = max(first, last);
+    }
+    if (firstData >= 0 && lastData >= 0 && firstData < log->size())
+    {
+        QDateTime dt = QDateTime::currentDateTime();
+        QString yr = QString::number(dt.date().year());
+        QString mn = QString::number(dt.date().month() / 10)+QString::number(dt.date().month() % 10);
+        QString dy = QString::number(dt.date().day() / 10)+QString::number(dt.date().day() % 10);
+        QString hr = QString::number(dt.time().hour() / 10)+QString::number(dt.time().hour() % 10);
+        QString mt = QString::number(dt.time().minute() / 10)+QString::number(dt.time().minute() % 10);
+        QString sc = QString::number(dt.time().second() / 10)+QString::number(dt.time().second() % 10);
+        QString res = "log-t-" + hr + "-" + mt + "-" + sc + "-d-" + dy + "-" + mn + "-" + yr + ".txt";
+        QFile file("log-t-" + hr + "-" + mt + "-" + sc + "-d-" + dy + "-" + mn + "-" + yr + ".txt");
+        QTextStream stream(&file);
+        if(file.open(QIODevice::WriteOnly | QIODevice::Text))
+        {
+            char*data = log->getData(firstData, lastData);
+            stream << data;
+            free(data);
+        }
+    }
 }
 
 void QByteView::setMaxLines(int maxLines, int bytesInLine)
@@ -308,34 +376,16 @@ void QByteView::setMaxLines(int maxLines, int bytesInLine)
     log->setMax(linesAmt_, bytesInLine_);
 }
 
-bool QByteView::setPS(int ps)
-{
-    if (ps == 0 || ps ==2 || ps == 4 || ps == 8 || ps == 16)
-    {
-        pointSys_ = ps;
-        return true;
-    }
-    return false;
-}
-
 void QByteView::clear()
 {
     log->clear();
-    if (isTextDisplayed_)
-        updateAscii();
-    else
-        rewrite();
+    redraw();
     putData(QString(""));
 }
 
 bool QByteView::isRawDisplayed()
 {
     return viewRaw_;
-}
-
-int QByteView::pointSys()
-{
-    return pointSys_;
 }
 
 int QByteView::linesAmt()
@@ -372,8 +422,6 @@ void QByteView::putData(const QByteArray & arr)
         else
            scroller->setValue((tmp2 <= shift ? 0 : tmp2-shift));
         rewrite();
-        if (isTextDisplayed_)
-            updateAscii();
 }
 
 void QByteView::putData(const QString & str)
@@ -424,33 +472,9 @@ void QByteView::ShowContextMenu(const QPoint &pos)
    contextMenu.exec(mapToGlobal(pos));
 }
 
-void QByteView::setAsciiLines()
-{
-    bytesInLine_ = field->width() / 18;
-    dispLines_ = field->height() / 35;
-    log->setLineSize(bytesInLine_);
-    scroller->setMaximum(log->linesAmt() - (log->linesAmt() < dispLines_ ? 0 : dispLines_));
-    this->updateAscii();
-}
-
-void QByteView::setByteLines()
-{
-    log->setLineSize(bytesInLine_);
-    if (field->isHidden())
-    {
-        scroller->setMaximum(log->linesAmt() - (log->linesAmt() < dispLines_ ? 0 : dispLines_));
-    }
-    else
-    {
-        this->updateAscii();
-        scroller->setMaximum(log->asciiLines() - (log->asciiLines() < dispLines_ ? 0 : dispLines_));
-    }
-}
-
 void QByteView::scrMoved(int val)
 {
     rewrite();
-    updateAscii();
 }
 
 void QByteView::resizeEvent(QResizeEvent*)
@@ -504,7 +528,7 @@ void QByteView::switchViews()
         }
         dataView->hide();
         field->show();
-        updateAscii();
+        rewrite();
     }
     field->hide();
     dataView->show();
@@ -563,7 +587,19 @@ void QByteView::slotEnableHighlighting()
     enableHighlight = !enableHighlight;
 }
 
-void QByteView::contextMenuEvent( QContextMenuEvent * e )
+void QByteView::slotExportSelected()
+{
+    exportSelected();
+}
+
+void QByteView::slotSelectAll()
+{
+    log->setSelectAll(true);
+    log->setFirstSel(0);
+    log->setSecondSel(log->size()-1);
+}
+
+void QByteView::contextMenuEvent(QContextMenuEvent *e)
 {
     QMenu* pContextMenu = new QMenu( this);
     QAction *pSwitchAction = new QAction("Switch view",this);
@@ -598,10 +634,17 @@ void QByteView::contextMenuEvent( QContextMenuEvent * e )
         pContextMenu->addAction(pEnableHighlighting);
         pContextMenu->addAction(pChooseFirst);
         pContextMenu->addAction(pChooseSecond);
+        QAction *pSelectAll = new QAction("Select all",this);
+        connect(pSelectAll ,SIGNAL(triggered()),this,SLOT(slotSelectAll()));
+        pContextMenu->addAction(pSelectAll);
         pContextMenu->addSeparator();
         QAction *pGoToHighlighted = new QAction("Go to highlighted",this);
         connect(pGoToHighlighted ,SIGNAL(triggered()),this,SLOT(slotGoToHighlighted()));
         pContextMenu->addAction(pGoToHighlighted);
+        pContextMenu->addSeparator();
+        QAction *pExport = new QAction("Export selected",this);
+        connect(pExport ,SIGNAL(triggered()),this,SLOT(slotExportSelected()));
+        pContextMenu->addAction(pExport);
         pContextMenu->addSeparator();
     }
     pContextMenu->addAction(pScrDwnAction);
@@ -627,6 +670,7 @@ void QByteView::mousePressEvent(QMouseEvent *event)
         }
         else
         {
+            log->setSelectAll(false);
             if (event->pos().x() > 50 && event->pos().x() < 650 && enableHighlight)
             {
                 if (chooseFirst)

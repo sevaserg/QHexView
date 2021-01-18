@@ -70,7 +70,7 @@ void custGView::mouseMoveEvent(QMouseEvent *event)
         if (event->pos().x() > 80 && event->pos().x() < 650)
         {
             col[0] = event->pos().x() - event->pos().x() % 30 - 10;
-            col[1] = (col[0] - 50)/4.3+655;
+            col[1] = static_cast<int>((col[0] - 50)/4.3+655);
             hexChoice->setX(col[0]);
             asciiChoice->setX(col[1]);
         }
@@ -84,7 +84,7 @@ void custGView::mouseMoveEvent(QMouseEvent *event)
     {
         if (event->pos().x() > 55)
         {
-            col[1] = event->pos().x() - event->pos().x() % 7 - 1;
+            col[1] = event->pos().x() - event->pos().x() % 8 + 1;
         }
         tab[1] = event->pos().y() - event->pos().y() % 20;
         printRects();
