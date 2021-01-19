@@ -16,18 +16,12 @@ QByteView::QByteView(QGroupBox *parent) : QGroupBox ( parent )//PointSys = 16, l
     mainLayout = new QHBoxLayout;
     mainLayout->setMargin(0);
     log = new byteLog;
-    field = new QPlainTextEdit;
+
     vscroller = new QScrollBar;
     hscroller = new QScrollBar;
     scroller = new QScrollBar;
     scroller->setMaximum(0);
     connect(scroller, SIGNAL(valueChanged(int)), this, SLOT(scrMoved(int)));
-    field->setVerticalScrollBar(vscroller);
-    field->setHorizontalScrollBar(hscroller);
-    field->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
-    field->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
-    field->setLineWrapMode(QPlainTextEdit::NoWrap);
-    field->setAttribute(Qt::WA_TransparentForMouseEvents);
     data = new QGraphicsScene;
     dataView = new custGView;
     dataView->setAlignment(Qt::AlignLeft | Qt::AlignTop);
@@ -37,21 +31,19 @@ QByteView::QByteView(QGroupBox *parent) : QGroupBox ( parent )//PointSys = 16, l
     dataView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     dataView->setMouseTracking(true);
     pointSys_ = 16;
-    linesAmt_ = 2000;
+    linesAmt_ = 15000000 / 20;
     bytesInLine_ = 20;
     log->setMax(linesAmt_, bytesInLine_);
     connect(this, SIGNAL(customContextMenuRequested(const QPoint &)),
             this, SLOT(ShowContextMenu(const QPoint &)));
     buf_ = static_cast<unsigned char *>(malloc(0));
     shifts = 0;
-    mainLayout->addWidget(field);
-    mainLayout->addWidget(dataView);
-    field->hide();
+    mainLayout->addWidget(dataView);;
     isTextDisplayed_ = true;
     mainLayout->addWidget(scroller);
     this->setLayout(mainLayout);
     dataView->printRects();
-    num = new QGraphicsSimpleTextItem[dispLines_];
+    //num = new QGraphicsSimpleTextItem[dispLines_];
     asciiMatrix = new QGraphicsSimpleTextItem*[dispLines_];
     matrix = new QGraphicsSimpleTextItem*[dispLines_];
     for (int i = 0; i < dispLines_; i++)
@@ -62,6 +54,14 @@ QByteView::QByteView(QGroupBox *parent) : QGroupBox ( parent )//PointSys = 16, l
     redraw();
     //rewrite();
     this->show();
+    this->setMinimumWidth(780);
+    wasResized = false;
+    resizeTimer = new QTimer;
+    updateTimer = new QTimer;
+    connect(resizeTimer, SIGNAL(timeout()), this, SLOT(slotResizeTimeout()));
+    connect(updateTimer, SIGNAL(timeout()), this, SLOT(slotUpdateTimeout()));
+    resizeTimer->start(50);
+    updateTimer->start(1000);
 }
 
 bool QByteView::isTextDisplayed()
@@ -72,16 +72,23 @@ bool QByteView::isTextDisplayed()
 void QByteView::rewriteHex()
 {
     char alphabet[16] = {'0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F'};
+    bool isMax = scroller->value() == scroller->maximum();
+    scroller->setMaximum(max(log->linesAmt() - dispLines_ + 1, 0));
+    if (isMax)
+        scroller->setValue(scroller->maximum());
     for (int i = 0; i < dispLines_; i++)
     {
-        num[i].setText(QString::number(scroller->value()+i+1));
-        for (int j = 0; j < 320 / pointSys_; j++)
+        //num[i].setText(QString::number(scroller->value()+i+1));
+        for (int j = 0; j < 20; j++)
         {
-            if(log->linesAmt() * 20 > (scroller->value()+i)*20+j)
+            //if(log->linesAmt() * 20 >= (scroller->value()+i)*20+j)
             {
+                if (log->size() > 20*(scroller->value()+i)+j)
+                {
                 int curElem = 20*(scroller->value()+i)+j;
                 QString str = "";
                 unsigned char info =((log->data()[curElem]));
+                //cout << "Element #" << curElem << ": " << info << endl;
                 if (
                     (
                         (
@@ -123,12 +130,18 @@ void QByteView::rewriteHex()
                     info /= pointSys_;
                 }
                 matrix[i][j].setText(str);
+                }
+                else
+                {
+                    asciiMatrix[i][j].setText("?");
+                    matrix[i][j].setText("??");
+                }
             }
-            else
+            /*else
             {
                 asciiMatrix[i][j].setText("?");
                 matrix[i][j].setText("??");
-            }
+            }*/
         }
     }
 }
@@ -142,15 +155,14 @@ void QByteView::redrawHex()
     }
     delete[]matrix;
     delete[]asciiMatrix;
-    delete[]num;
     dataView->clear();
     data->clear();
     dataView->switchViews(false);
-    int offset = 650, strOffset = 50;
+    int offset = 600, strOffset = 0;
     lineSz = 20;
     dispLines_ = this->height()/20;
+    scroller->setMaximum(max(log->linesAmt() - dispLines_ + 1, 0));
     dataView->resize();
-    num = new QGraphicsSimpleTextItem[dispLines_];
     asciiMatrix = new QGraphicsSimpleTextItem*[dispLines_];
     matrix = new QGraphicsSimpleTextItem*[dispLines_];
     for (int i = 0; i < dispLines_; i++)
@@ -160,9 +172,6 @@ void QByteView::redrawHex()
     }
     for (int i = 0; i < dispLines_; i++)
     {
-        num[i].setText(QString::number(scroller->value()+i+1));
-        data->addItem(&num[i]);
-        num[i].moveBy(5, 20*i);
         for (int j = 0; j < 320 / pointSys_; j++)
         {
             matrix[i][j].setFont(fnt);
@@ -174,10 +183,10 @@ void QByteView::redrawHex()
     }
     dataView->initRect();
     dataView->printRects();
-    data->addLine(strOffset, 0, strOffset,dataView->height() - 20);
-    data->addLine(0, 0, 0,dataView->height() - 20);
-    data->addLine(offset, 0, offset,dataView->height() - 20);
-    data->addLine(offset+1, 0, offset+1,dataView->height() - 20);
+    //data->addLine(strOffset, 0, strOffset,dataView->height() - 20);
+    //data->addLine(0, 0, 0,dataView->height() - 20);
+    data->addLine(offset, 0, offset,dataView->height());
+    data->addLine(offset+1, 0, offset+1,dataView->height());
     rewriteHex();
 }
 
@@ -185,7 +194,7 @@ void QByteView::rewriteAscii()
 {
     for (int i = 0; i < dispLines_; i++)
     {
-        num[i].setText(QString::number(scroller->value()+i+1));
+        //num[i].setText(QString::number(scroller->value()+i+1));
         unsigned char* ln = log->asciiLine(scroller->value()+i+1);
         QString d = QString(reinterpret_cast<char*>(ln));
         for (int j = 0; j < lineSz; j++)
@@ -196,7 +205,7 @@ void QByteView::rewriteAscii()
                 asciiMatrix[i][j].setText(d.at(j));
                 if (log->asciiSel1Active() >= 0 && log->asciiSel2Active() >= 0)
                 {
-                    cout << "Current " << scroller->value() + i << ", left "  << log->asciiSel1Line() << ", right " << log->asciiSel2Line() << endl;
+                    //cout << "Current " << scroller->value() + i << ", left "  << log->asciiSel1Line() << ", right " << log->asciiSel2Line() << endl;
                     if((scroller->value() + i  > log->asciiSel1Line() && scroller->value() + i  < log->asciiSel2Line()) || (scroller->value() + i  > log->asciiSel2Line() && scroller->value() + i  < log->asciiSel1Line()))
                     {
                         asciiMatrix[i][j].setBrush(QBrush(Qt::red));
@@ -263,7 +272,6 @@ void QByteView::rewriteAscii()
             else
                 asciiMatrix[i][j].setText("");
             }
-
         free(ln);
     }
 }
@@ -277,15 +285,14 @@ void QByteView::redrawAscii()
     }
     delete[]asciiMatrix;
     delete[]matrix;
-    delete[]num;
     dataView->clear();
     data->clear();
     dataView->switchViews(true);
     lineSz = this->width()/8;
     dispLines_ = this->height()/20;
-    int strOffset = 50;
+    scroller->setMaximum(max(log->asciiLines() - dispLines_, 0));
+    int strOffset = 0;
     dataView->resize();
-    num = new QGraphicsSimpleTextItem[dispLines_];
     asciiMatrix = new QGraphicsSimpleTextItem*[dispLines_];
     matrix = new QGraphicsSimpleTextItem*[dispLines_];
     for (int i = 0; i < dispLines_; i++)
@@ -296,16 +303,13 @@ void QByteView::redrawAscii()
 
     for (int i = 0; i < dispLines_; i++)
     {
-        num[i].setText(QString::number(scroller->value()+i+1));
-        data->addItem(&num[i]);
-        num[i].moveBy(5, 20*i);
         for (int j = 0; j < lineSz;j++)
         {
             data->addItem(&asciiMatrix[i][j]);
-            asciiMatrix[i][j].moveBy(strOffset+8*(j+1), 20*i);
+            asciiMatrix[i][j].moveBy(strOffset+8*j, 20*i);
         }
     }
-    data->addLine(strOffset, 0, strOffset,dataView->height() - 20);
+    //data->addLine(strOffset, 0, strOffset,dataView->height() - 20);
     dataView->initRect();
     dataView->printRects();
     rewriteAscii();
@@ -379,8 +383,10 @@ void QByteView::setMaxLines(int maxLines, int bytesInLine)
 void QByteView::clear()
 {
     log->clear();
+    scroller->setValue(0);
+    scroller->setMaximum(0);
     redraw();
-    putData(QString(""));
+    //putData(QString(""));
 }
 
 bool QByteView::isRawDisplayed()
@@ -421,7 +427,19 @@ void QByteView::putData(const QByteArray & arr)
             scroller->setValue(scroller->maximum());
         else
            scroller->setValue((tmp2 <= shift ? 0 : tmp2-shift));
-        rewrite();
+        if (log->selectAll())
+        {
+            log->setFirstSel(0);
+            log->setSecondSel(log->size() - 1);
+        }
+        //==================================================
+        if (shift > 0)
+        {
+            cout <<"Full!"<<endl;
+        }
+        //==================================================
+        //rewrite();
+        shouldUpdate = true;
 }
 
 void QByteView::putData(const QString & str)
@@ -443,6 +461,7 @@ QString QByteView::getQString()
 
 QByteView::~QByteView()
 {
+    delete resizeTimer;
     free(buf_);
     for (int i = 0; i < dispLines_; i++)
     {
@@ -451,7 +470,7 @@ QByteView::~QByteView()
     }
     delete[]matrix;
     delete[]asciiMatrix;
-    delete[]num;
+    //delete[]num;
     dataView->clear();
     delete mainLayout;
     delete dataView;
@@ -460,7 +479,7 @@ QByteView::~QByteView()
     delete vscroller;
     delete hscroller;
     delete log;
-    delete field;
+    delete updateTimer;
 }
 
 void QByteView::ShowContextMenu(const QPoint &pos)
@@ -472,40 +491,55 @@ void QByteView::ShowContextMenu(const QPoint &pos)
    contextMenu.exec(mapToGlobal(pos));
 }
 
-void QByteView::scrMoved(int val)
+void QByteView::scrMoved(int)
 {
-    rewrite();
+    //rewrite();
+    //redraw();
+    shouldUpdate = true;
+    if (scroller->maximum() == scroller->value())
+    {
+        //cout << "scrollbar: " << scroller->value()+1 << "-" << scroller->value()+dispLines_+1
+        //     << "; last ASCII string: " << log->asciiLines()+1 << ", value: " << log->asciiLine(log->asciiLines()+1) << endl;
+    }
 }
 
 void QByteView::resizeEvent(QResizeEvent*)
 {
-    redraw();
+    wasResized = true;
+    //redraw();
 }
 
 void QByteView::switchViews()
 {
     int tempVal = scroller->value();
+    bool isMax = scroller->value() == scroller->maximum();
     if (isTextDisplayed_)
     {
-        if (log->linesAmt() - dispLines_ >= 0)
-            scroller->setMaximum(log->linesAmt() - dispLines_);
-        else
-            scroller->setMaximum(0);
+        //if (log->linesAmt() - dispLines_ >= 0)
+            //scroller->setMaximum(log->linesAmt() - dispLines_);
+            scroller->setMaximum(max(log->linesAmt() - dispLines_ + 1, 0));
+        //else
+            //scroller->setMaximum(0);
         scroller->setMinimum(0);
-        int byteLineNum = log->ALNToBLN(tempVal);
-        if (scroller->value() != scroller->maximum())
+        if (isMax)
         {
-            if (byteLineNum + dispLines_ < log->linesAmt())
+            scroller->setValue(scroller->maximum());
+        }
+        else
+        {
+            int byteLineNum = log->ALNToBLN(tempVal);
+            if (scroller->value() != scroller->maximum())
             {
-                scroller->setValue(byteLineNum);
-            }
-            else
-            {
-                scroller->setValue(scroller->maximum());
+                if (byteLineNum + dispLines_ < log->linesAmt())
+                {
+                    scroller->setValue(byteLineNum);
+                }
+                else
+                {
+                    scroller->setValue(scroller->maximum());
+                }
             }
         }
-        field->hide();
-        dataView->show();
     }
     else
     {
@@ -514,23 +548,27 @@ void QByteView::switchViews()
         else
             scroller->setMaximum(0);
         scroller->setMinimum(0);
-        int asciiLineNum = log->BLNToALN(tempVal);
-        if (scroller->value() != scroller->maximum())
+        if (isMax)
         {
-            if (asciiLineNum + dispLines_ < log->asciiLines())
+            scroller->setValue(scroller->maximum());
+        }
+        else
+        {
+            int asciiLineNum = log->BLNToALN(tempVal);
+            if (scroller->value() != scroller->maximum())
             {
-                scroller->setValue(asciiLineNum + 1);
-            }
-            else
-            {
-                scroller->setValue(scroller->maximum());
+                if (asciiLineNum + dispLines_ < log->asciiLines())
+                {
+                    scroller->setValue(asciiLineNum + 1);
+                }
+                else
+                {
+                    scroller->setValue(scroller->maximum());
+                }
             }
         }
-        dataView->hide();
-        field->show();
         rewrite();
     }
-    field->hide();
     dataView->show();
     isTextDisplayed_ = !isTextDisplayed_;
     redraw();
@@ -597,6 +635,28 @@ void QByteView::slotSelectAll()
     log->setSelectAll(true);
     log->setFirstSel(0);
     log->setSecondSel(log->size()-1);
+    rewrite();
+}
+
+void QByteView::slotResizeTimeout()
+{
+    if (wasResized)
+    {
+        redraw();
+        wasResized = false;
+    }
+}
+
+void QByteView::slotUpdateTimeout()
+{
+    if (shouldUpdate)
+    {
+        bool isMax = scroller->maximum() == scroller->value();
+        redraw();
+        if (isMax)
+            scroller->setValue(scroller->maximum());
+        shouldUpdate = false;
+    }
 }
 
 void QByteView::contextMenuEvent(QContextMenuEvent *e)
@@ -610,7 +670,7 @@ void QByteView::contextMenuEvent(QContextMenuEvent *e)
     connect(pScrDwnAction ,SIGNAL(triggered()),this,SLOT(slotScrDwn()));
     pContextMenu->addAction(pSwitchAction);
     pContextMenu->addAction(pClearAction);
-    if (!isTextDisplayed_)
+    //if (!isTextDisplayed_)
     {
         pContextMenu->addSeparator();
         QAction *pCopy = new QAction("Copy",this);
@@ -654,32 +714,33 @@ void QByteView::contextMenuEvent(QContextMenuEvent *e)
 
 void QByteView::mousePressEvent(QMouseEvent *event)
 {
-    if (event->buttons() == Qt::LeftButton)
+    if (event->buttons() == Qt::LeftButton && enableHighlight)
     {
+        int rw = static_cast<int>(dataView->getY());
+        int cl = static_cast<int>(dataView->getX());
         if (isTextDisplayed_)
         {
-            int rw = event->y() / 30 - 2;
-            int cl = event->x() / 30;
-            if (rw >= 0 && cl <= log->asciiLineLen(scroller->value() + rw))
+            if (cl <= log->asciiLineLen(scroller->value() + rw) && enableHighlight)
             {
-                cout << "Button pressed! X = " << event->x() << ", Y = " << event->y() << endl;
-                cout << "first element was chosen! Row " << event->y() / 30 - 2 <<
-                        ", column: " << event->x() / 30 << endl;
-                log->setFirstSel(log->getFirstSymInAsciiLine(scroller->value() + cl));
+                if (chooseFirst)
+                    log->setFirstSel(log->getFirstSymInAsciiLine(scroller->value() + rw) + min(log->asciiLineLen(scroller->value() + rw), cl));
+                else
+                    log->setSecondSel(log->getFirstSymInAsciiLine(scroller->value() + rw) + min(log->asciiLineLen(scroller->value() + rw), cl));
             }
         }
         else
         {
             log->setSelectAll(false);
-            if (event->pos().x() > 50 && event->pos().x() < 650 && enableHighlight)
+            if (event->pos().x() < 600)
             {
                 if (chooseFirst)
-                    log->setFirstSel(static_cast<int>((scroller->value() + dataView->getHexY() / 20) * 20 + (dataView->getHexX()-50) / 30));
+                    log->setFirstSel(static_cast<int>((scroller->value() + rw) * 20 + cl));
                 else
-                    log->setSecondSel(static_cast<int>((scroller->value() + dataView->getHexY() / 20) * 20 + (dataView->getHexX()-50) / 30));
-                rewrite();
+                    log->setSecondSel(static_cast<int>((scroller->value() + rw) * 20 + cl));
+
             }
         }
+        rewrite();
     }
 }
 

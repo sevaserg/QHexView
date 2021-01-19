@@ -1,5 +1,6 @@
 #include "custgview.h"
-
+#include <iostream>
+using namespace std;
 custGView::custGView()
 {
     isTextDisplayed_ = false;
@@ -63,14 +64,42 @@ qreal custGView::getHexY()
     return hexChoice->y();
 }
 
+qreal custGView::getX()
+{
+    if (isTextDisplayed_)
+    {
+
+        return(col[1] / 8);
+    }
+    else
+    {
+        return(col[0] / 30);
+    }
+    // int rw = event->y() / 20;
+}
+
+qreal custGView::getY()
+{
+    if (isTextDisplayed_)
+    {
+
+        return(tab[1] / 20);
+    }
+    else
+    {
+        return(tab[0] / 20);
+    }
+    // int rw = event->y() / 20;
+}
+
 void custGView::mouseMoveEvent(QMouseEvent *event)
 {
     if (!isTextDisplayed_)
     {
-        if (event->pos().x() > 80 && event->pos().x() < 650)
+        if (event->pos().x() < 600)
         {
-            col[0] = event->pos().x() - event->pos().x() % 30 - 10;
-            col[1] = static_cast<int>((col[0] - 50)/4.3+655);
+            col[0] = event->pos().x() - event->pos().x() % 30;
+            col[1] = static_cast<int>((col[0] - 50)/4.3+615);
             hexChoice->setX(col[0]);
             asciiChoice->setX(col[1]);
         }
@@ -82,9 +111,9 @@ void custGView::mouseMoveEvent(QMouseEvent *event)
     }
     else
     {
-        if (event->pos().x() > 55)
+        if (event->pos().x() > 5)
         {
-            col[1] = event->pos().x() - event->pos().x() % 8 + 1;
+            col[1] = event->pos().x() - event->pos().x() % 8;
         }
         tab[1] = event->pos().y() - event->pos().y() % 20;
         printRects();

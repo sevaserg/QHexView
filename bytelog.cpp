@@ -12,7 +12,7 @@ byteLog::byteLog()
 {
     selectAll_ = false;
     lineSize_ = 20;
-    maximum_ = 75000;
+    maximum_ = 15000000;
     this->data_ = static_cast<unsigned char*>(malloc(0));
     this->size_ = 0;
     asciiShift_ = 0;
@@ -210,8 +210,7 @@ int byteLog::push(const unsigned char* data, int amt)
 
         memmove(data_+static_cast<size_t>(size_), data, static_cast<size_t>(amt));  //и кладём в конец новые данные
         size_+=amt;                                                                 //увеличиваем размер на число новых значений
-        return 0;                                                                   //Сдвигать ничего не потребовалось.
-
+        return 0;
     }
 
     else //если сдвигать всё же требуется
@@ -234,12 +233,6 @@ int byteLog::push(const unsigned char* data, int amt)
         size_ += amt - shifts * lineSize_; //пересчитываем размер
         free(data_); //удаляем старый массив
         data_ = tmp; //меняем на новый
-        if (selectAll_)
-        {
-            firstSel_ = 0;
-            secondSel_ = size_-1;
-        }
-        else
         {
             if (firstSel_ >= 0)
             {
@@ -299,6 +292,8 @@ int byteLog::asciiLines()
     for (int i = 0; i < size_; i++)
         if (data_[i] == '\n')
             lns++;
+    if (data_[size_-1] != '\n')
+        lns++;
     return lns;
 }
 
@@ -307,12 +302,14 @@ unsigned char* byteLog::asciiLine(int lineNum)
 
     size_t pos1 = 0, pos2 = 0;
     unsigned char* ret;
-    if (lineNum >= asciiLines())
+    int asciiLns = asciiLines();
+    if (lineNum > asciiLns)
     {
         ret = static_cast<unsigned char*>(malloc(1));
         ret[0] = '\0';
         return ret;
     }
+
     int cnt = 0;
     for (int i = 0; i < size_; i++)
     {
@@ -341,7 +338,7 @@ unsigned char* byteLog::asciiLine(int lineNum)
 int byteLog::asciiLineLen(int lineNum)
 {
     size_t pos1 = 0, pos2 = 0;
-    int cnt = 0;
+    int cnt = -1;
     for (int i = 0; i < size_; i++)
     {
         if ((data_[i] == '\n') || (i == size_-1))
@@ -358,8 +355,8 @@ int byteLog::asciiLineLen(int lineNum)
 
 int byteLog::getFirstSymInAsciiLine(int lineNum)
 {
-    if (lineNum == 0)
-        return -1;
+    /*if (lineNum == 0)
+        return -1;*/
     size_t pos = 0;
     int cnt = 0;
     for (int i = 0; i < size_; i++)

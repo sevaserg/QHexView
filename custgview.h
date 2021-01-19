@@ -24,6 +24,8 @@ public:
     void initRect();
     void resize();
     void printRects();
+    qreal getX();
+    qreal getY();
     qreal getHexX();
     qreal getHexY();
     void mouseMoveEvent(QMouseEvent *event);

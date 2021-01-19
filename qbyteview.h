@@ -20,6 +20,8 @@
 #include <QShortcut>
 #include <QDateTime>
 #include <QTextStream>
+#include <QThread>
+
 #include "bytelog.h"
 #include "custgview.h"
 
@@ -31,13 +33,16 @@ private:
 protected:
     QScrollBar  *hscroller, *vscroller, *scroller;
     QHBoxLayout* mainLayout;
-    QPlainTextEdit* field;
     QGraphicsScene* data;
     custGView* dataView;
-    QGraphicsSimpleTextItem*num;
     QGraphicsSimpleTextItem**matrix;
     QGraphicsSimpleTextItem**asciiMatrix;
     QFont fnt;
+    QTimer* resizeTimer,* updateTimer;
+    bool wasResized;
+    bool shouldUpdate;
+    int shiftsCnt;
+    int asciiShiftsCnt;
     bool isTextDisplayed_;
     bool enableHighlight;
     bool chooseFirst;
@@ -148,7 +153,7 @@ public:
 
     ~QByteView();
 protected slots:
-    void scrMoved(int val);
+    void scrMoved(int);
     void ShowContextMenu(const QPoint &pos);
     void slotSwitchViews();
     void slotClear();
@@ -160,6 +165,8 @@ protected slots:
     void slotEnableHighlighting();
     void slotExportSelected();
     void slotSelectAll();
+    void slotResizeTimeout();
+    void slotUpdateTimeout();
 };
 
 
