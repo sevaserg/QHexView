@@ -97,15 +97,7 @@ QHexView::QHexView(QWidget *parent)
 //====================================================
 //          Public-методы
 //====================================================
-/*
-QString get_data()
-{
 
-}
-QByteArray QHexView::get_data()
-{
-    return byteArray;
-}*/
 
 void QHexView::autoResize()
 {

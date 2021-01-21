@@ -21,7 +21,7 @@
 #include <QDateTime>
 #include <QTextStream>
 #include <QThread>
-
+#include <QBrush>
 #include "bytelog.h"
 #include "custgview.h"
 
@@ -41,6 +41,7 @@ protected:
     QTimer* resizeTimer,* updateTimer;
     bool wasResized;
     bool shouldUpdate;
+    bool shouldRewrite;
     int shiftsCnt;
     int asciiShiftsCnt;
     bool isTextDisplayed_;

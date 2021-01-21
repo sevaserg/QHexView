@@ -6,7 +6,8 @@ class byteLog
 private:
     bool selectAll_;
     unsigned char* data_;
-    unsigned char* buffer;
+    int *FSIAS_; //First Symbols In ASCII String
+    int FSIASSize_;
     int firstSel_;
     int secondSel_;
     int lineSize_;
@@ -59,6 +60,10 @@ public:
     int asciiShift();
     unsigned char* asciiLine(int lineNum);
     ~byteLog();
+
+
+    void updateFSIAS();
+    void test();
 };
 
 
