@@ -71,7 +71,7 @@ protected:
     void contextMenuEvent( QContextMenuEvent * e );
     void mousePressEvent(QMouseEvent *event);
 public:
-    QByteView(QGroupBox *parent = 0);
+    QByteView(int linesAmt, QGroupBox *parent = 0);
 
 //================================================================
 //================================================================

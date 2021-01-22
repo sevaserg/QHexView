@@ -4,18 +4,16 @@
 #include <stdio.h>
 #include <memory.h>
 #include <string.h>
-
-
-#include <QElapsedTimer>
-#include <QDebug>
 #include <iostream>
+#include <QElapsedTimer>
+
 using namespace std;
 
 byteLog::byteLog()
 {
     selectAll_ = false;
     lineSize_ = 20;
-    maximum_ = 15000000;
+    maximum_ = 1500;
     this->FSIAS_ = static_cast<int*>(malloc(0));
     this->data_ = static_cast<unsigned char*>(malloc(0));
     this->size_ = 0;
@@ -51,20 +49,18 @@ int byteLog::max_()
 
 void byteLog::setMax(int newMax)
 {
-    if (size_ > newMax)                                                 // Если новый максимальный размер меньше числа элементов
-    {
-        unsigned char* tmp = static_cast<unsigned char *>( malloc(static_cast<size_t>(newMax)) );           //создаём массив tmp величиной с новый максимум
-        memmove(tmp,data_+(maximum_ - newMax - 1), static_cast<size_t>(newMax));   //переносим все последние влезающие значения из data_
-        size_ = newMax;                                                 //меняем размер на новый максимум
-        free(data_);                                                    //меняем старый "большой" массив
-        data_ = tmp;                                                    //на новый
-    }
-    maximum_ = newMax;                                                  //максимум меняем
+    clear();
+    maximum_ = newMax;
 }
 
 void byteLog::setMax(int linesAmt, int lineSize)
 {
     lineSize_ = lineSize;
+    lines_ = linesAmt;
+    clear();
+    size_ = 0;
+    maximum_ = linesAmt*lineSize;
+
     setMax(linesAmt*lineSize);
 }
 
@@ -179,34 +175,15 @@ bool byteLog::selectAll()
 
 int byteLog::ALNToBLN(int ALN) // ASCII Line Number to Byte Line Number
 {
-    /*
-    int i = 0, cntr = 0;
-    for (i = 0; i < size_; i++)
-    {
-        if (data_[i] == '\n')
-            cntr++;
-        if (cntr == ALN)
-            break;
-    }
-    return i / lineSize_;*/
-    cout <<"ALN " <<ALN << ", BLN " << (FSIAS_[ALN] / lineSize_) << ", total BLN: " << linesAmt() << ", total ALN: " << asciiLines() << endl;
     return(FSIAS_[ALN] / lineSize_);
 }
 
 int byteLog::BLNToALN(int BLN) // Byte Line Number to ASCII Line Number
 {
-    /*int i = 0, cntr = 0;
-    for (i = 0; i < BLN * lineSize_; i++)
-    {
-        if (data_[i] == '\n')
-            cntr++;
-    }
-    return cntr;*/
     for (int i = 0; i < FSIASSize_; i++)
     {
         if (FSIAS_[i] >= BLN*lineSize_)
         {
-            cout <<"BLN " <<BLN << ", ALN " << i << ", total BLN: " << linesAmt() << ", total ALN: " << asciiLines() << endl;
             return i;
         }
     }
@@ -217,8 +194,6 @@ int byteLog::push(const unsigned char* data, int amt)
 {
     if (amt > maximum_) return -1;
     if (amt == 0) return 0;
-    int tempAsciiStringsCnt = 0;
-    int *tempAsciiStringsNum = static_cast<int*>(malloc(sizeof(int)));
     if (FSIASSize_ == 0)
     {
         FSIAS_ = static_cast<int*>(malloc(sizeof(int)));
@@ -230,7 +205,7 @@ int byteLog::push(const unsigned char* data, int amt)
         if(data_[size_-1] == '\n')
         {
             FSIASSize_++;
-            FSIAS_ = static_cast<int*>(realloc(FSIAS_, sizeof(int)*FSIASSize_));
+            FSIAS_ = static_cast<int*>(realloc(FSIAS_, sizeof(int)*static_cast<size_t>(FSIASSize_)));
             FSIAS_[FSIASSize_-1] = size_;
         }
     }
@@ -241,7 +216,7 @@ int byteLog::push(const unsigned char* data, int amt)
         {
 //=================================
             FSIASSize_++;
-            FSIAS_ = static_cast<int*>(realloc(FSIAS_, sizeof(int)*FSIASSize_));
+            FSIAS_ = static_cast<int*>(realloc(FSIAS_, sizeof(int)*static_cast<size_t>(FSIASSize_)));
             FSIAS_[FSIASSize_-1] = i+tmpvl;
 //=================================
         }
@@ -254,8 +229,7 @@ int byteLog::push(const unsigned char* data, int amt)
 
 
 
-        updateFSIAS();
-
+        //updateFSIAS();
         return 0;
     }
 
@@ -269,13 +243,14 @@ int byteLog::push(const unsigned char* data, int amt)
         unsigned char* tmp = static_cast<unsigned char*>( malloc(static_cast<size_t>(size_ + amt - shifts * lineSize_)) ); //создаём такой же массив
         memmove(tmp, data_ + (shifts) * lineSize_, static_cast<size_t>(size_ - shifts * lineSize_)); //переносим туда лог, но без последних строк
         memmove(tmp+(size_ - shifts * lineSize_), data, static_cast<size_t>(amt));                       //переносим новую информацию
-
-        for (int i = 0; i < (shifts) * lineSize_; i++) //считаем число сдвигов по ascii (число выдвинутых \n)
+        unsigned char *delTmp = static_cast<unsigned char*>(malloc(static_cast<size_t>(shifts * lineSize_)));
+        memmove(delTmp, data_, static_cast<size_t>(shifts * lineSize_));
+        for (int i = 0; i < shifts * lineSize_; i++) //считаем число сдвигов по ascii (число выдвинутых \n)
         {
-            if (data_[i] == '\n')
+            if (delTmp[i] == '\n')
                 asciiShift_++;
         }
-
+        free(delTmp);
         size_ += amt - shifts * lineSize_; //пересчитываем размер
         free(data_); //удаляем старый массив
         data_ = tmp; //меняем на новый
@@ -293,8 +268,11 @@ int byteLog::push(const unsigned char* data, int amt)
         }
         FSIASSize_ -= asciiShift_;
         int *temp = static_cast<int*>(malloc(sizeof(int) * static_cast<size_t>(FSIASSize_)));
-        memcpy(temp, FSIAS_+ asciiShift_, static_cast<size_t>(FSIASSize_));
+        memmove(temp, FSIAS_+ asciiShift_, static_cast<size_t>(FSIASSize_));
+        //cout << "Copied! asciiShift = " << asciiShift_ <<", FSIASSize_ = " << FSIASSize_ << endl;
+        free(FSIAS_);
         FSIAS_ = temp;
+        //cout << "tmpval = " << FSIAS_[0] << endl;
         int tmpval = FSIAS_[0];
         //можно попробовать ускорить с помощью OpenMP.
         for (int i = 0; i < FSIASSize_; i++)
@@ -357,17 +335,26 @@ unsigned char* byteLog::asciiLine(int lineNum)
         ret[0] = '\0';
         return ret;
     }
-    pos1 = FSIAS_[lineNum-1];
+    pos1 = static_cast<size_t>(FSIAS_[lineNum-1]);
     if(FSIASSize_ <= lineNum)
     {
-        pos2 = size_;
+        pos2 = static_cast<size_t>(size_);
     }
     else
     {
-         pos2 = FSIAS_[lineNum];
+         pos2 = static_cast<size_t>(FSIAS_[lineNum]);
     }
     ret = static_cast<unsigned char*>(malloc(static_cast<size_t>(pos2-pos1)));
-    memcpy(ret, data_+pos1, pos2-1-pos1);
+    //cout << "==================="<<endl;
+    //cout << "FSIAS:" << endl;
+    //for(int i = 0; i < FSIASSize_; i++)
+    {
+        //cout << i + 1<< ":\t" << FSIAS_[i] << endl;
+    }
+    //cout << "==================="<<endl;
+    //cout << "pos1 = FSIAS_[" << lineNum-1 << "], pos2 = FSIAS_[" << lineNum << "], FSIASSize_ = " << FSIASSize_<< endl;
+    //cout << "pos1 = " << pos1 << ", pos2 = " << pos2 << endl;
+    memmove(ret, data_+pos1, pos2-1-pos1);
     ret[pos2-pos1-1] = '\0';
     return ret;
 }
@@ -440,8 +427,7 @@ byteLog::~byteLog()
 }
 
 void byteLog::updateFSIAS()
-{        //QElapsedTimer timer;
-         //timer.start();
+{
     free(FSIAS_);
     FSIASSize_ = 1;
     FSIAS_ = static_cast<int*>(malloc(sizeof(int)));
@@ -459,5 +445,5 @@ void byteLog::updateFSIAS()
         }
 
     }
-    //cout << timer.nsecsElapsed() << " nsecs, " << size_ << " elements." << endl;
+
 }

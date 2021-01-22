@@ -2,7 +2,7 @@
 #include <iostream>
 using namespace std;
 
-QByteView::QByteView(QGroupBox *parent) : QGroupBox ( parent )//PointSys = 16, linesAmt = 10000, bytesInLine = 16
+QByteView::QByteView(int linesAmt, QGroupBox *parent) : QGroupBox ( parent )//PointSys = 16, linesAmt = 10000, bytesInLine = 16
 {
     setMouseTracking(true);
     shouldUpdate = false;
@@ -32,9 +32,10 @@ QByteView::QByteView(QGroupBox *parent) : QGroupBox ( parent )//PointSys = 16, l
     dataView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     dataView->setMouseTracking(true);
     pointSys_ = 16;
-    linesAmt_ = 15000000 / 20;
+    linesAmt_ = linesAmt;
     bytesInLine_ = 20;
     log->setMax(linesAmt_, bytesInLine_);
+    cout << "max lines: " << log->maxLines();
     connect(this, SIGNAL(customContextMenuRequested(const QPoint &)),
             this, SLOT(ShowContextMenu(const QPoint &)));
     buf_ = static_cast<unsigned char *>(malloc(0));
@@ -420,6 +421,7 @@ void QByteView::putData(const QByteArray & arr)
             log->setFirstSel(0);
             log->setSecondSel(log->size() - 1);
         }
+        cout << "current size: " << log->size() << " max: " << log->max_() << endl;
         shouldRewrite = true;
 }
 
@@ -679,6 +681,7 @@ void QByteView::mousePressEvent(QMouseEvent *event)
 {
     if (event->buttons() == Qt::LeftButton && enableHighlight)
     {
+        log->setSelectAll(false);
         int rw = static_cast<int>(dataView->getY());
         int cl = static_cast<int>(dataView->getX());
         if (isTextDisplayed_)
@@ -693,7 +696,6 @@ void QByteView::mousePressEvent(QMouseEvent *event)
         }
         else
         {
-            log->setSelectAll(false);
             if (event->pos().x() < 600)
             {
                 if (chooseFirst)

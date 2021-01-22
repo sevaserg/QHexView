@@ -5,11 +5,12 @@ MainWindow::MainWindow(QWidget *parent)
     QVBoxLayout *main_lay = new QVBoxLayout;
 
     com_wgt = new ComPortWgt( "COM11");
-    byteview_wgt = new QByteView;
+    byteview_wgt = new QByteView(10);
 
     main_lay->addWidget( com_wgt );
     main_lay->addWidget( byteview_wgt );
     byteview_wgt->show();
+    byteview_wgt->setMaxLines(3);
     QWidget *central_wgt = new QWidget;
     central_wgt->setLayout( main_lay );
 
