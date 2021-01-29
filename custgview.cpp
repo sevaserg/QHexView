@@ -38,11 +38,6 @@ void custGView::initRect()
     this->scene()->addItem(asciiChoice);
 }
 
-void custGView::resize()
-{
-
-}
-
 void custGView::printRects()
 {
     if(!isTextDisplayed_)
@@ -67,29 +62,17 @@ qreal custGView::getHexY()
 qreal custGView::getX()
 {
     if (isTextDisplayed_)
-    {
-
         return(col[1] / 8);
-    }
     else
-    {
         return(col[0] / 30);
-    }
-    // int rw = event->y() / 20;
 }
 
 qreal custGView::getY()
 {
     if (isTextDisplayed_)
-    {
-
         return(tab[1] / 20);
-    }
     else
-    {
         return(tab[0] / 20);
-    }
-    // int rw = event->y() / 20;
 }
 
 void custGView::mouseMoveEvent(QMouseEvent *event)
@@ -112,9 +95,7 @@ void custGView::mouseMoveEvent(QMouseEvent *event)
     else
     {
         if (event->pos().x() > 5)
-        {
             col[1] = event->pos().x() - event->pos().x() % 8;
-        }
         tab[1] = event->pos().y() - event->pos().y() % 20;
         printRects();
     }

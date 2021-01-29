@@ -22,7 +22,6 @@ public:
     void switchViews(bool val);
     void clear();
     void initRect();
-    void resize();
     void printRects();
     qreal getX();
     qreal getY();

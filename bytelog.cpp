@@ -1,19 +1,9 @@
 #include "bytelog.h"
-#include <stdlib.h>
-#include <malloc.h>
-#include <stdio.h>
-#include <memory.h>
-#include <string.h>
-#include <iostream>
-#include <QElapsedTimer>
-
-using namespace std;
 
 byteLog::byteLog()
 {
     selectAll_ = false;
     lineSize_ = 20;
-    maximum_ = 1500;
     this->FSIAS_ = static_cast<int*>(malloc(0));
     this->data_ = static_cast<unsigned char*>(malloc(0));
     this->size_ = 0;
@@ -37,54 +27,17 @@ int byteLog::lineSize()
     return lineSize_;
 }
 
-void byteLog::setLineSize(int newLineSize)
-{
-    lineSize_ = newLineSize;
-}
-
-int byteLog::max_()
-{
-    return maximum_;
-}
-
-void byteLog::setMax(int newMax)
-{
-    clear();
-    maximum_ = newMax;
-}
-
 void byteLog::setMax(int linesAmt, int lineSize)
 {
     lineSize_ = lineSize;
     lines_ = linesAmt;
     clear();
     size_ = 0;
-    maximum_ = linesAmt*lineSize;
-
-    setMax(linesAmt*lineSize);
 }
 
 int byteLog::maxLines()
 {
     return lines_;
-}
-
-void byteLog::push(unsigned char data)
-{
-
-    if (size_ != maximum_)                                      //в случае, если элемент влезает
-    {
-        data_ = static_cast<unsigned char*>( realloc(data_, static_cast<size_t>(++size_)) );     //просто расширяем массив на один элемент
-    }
-    else //иначе сдвигаем элементы в массиве влево на "строку" (n позиций)
-    {
-        unsigned char* tmp = static_cast<unsigned char*>( malloc(static_cast<size_t>(size_ - lineSize_)));       //создаём такой же по размеру массив
-        memmove( tmp, data_+sizeof(unsigned char), static_cast<size_t>(size_-lineSize_) );           // переносим все элементы начиная с n-того, наким образом последний элемент свободен
-        free(data_);                                                            //удаляем старый массив
-        data_ = tmp;                                                            //присваиваем новый
-        size_-=lineSize_+1;                                                       //Не забываем указать в size_, что массив стал на строку легче. Плюс один элемент.
-    }
-    data_[size_-1] = data;                                                      //в последнюю ячейку кладём элемент
 }
 
 void byteLog::setFirstSel(int num)
@@ -129,38 +82,35 @@ int byteLog::asciiSel2Sym()
     return asciiSel2_[2];
 }
 
-int byteLog::asciiSel1Active()
+bool byteLog::asciiSel1Active()
 {
-    return asciiSel1_[0];
+    return asciiSel1_[0] > 0;
 }
 
-int byteLog::asciiSel2Active()
+bool byteLog::asciiSel2Active()
 {
-    return asciiSel2_[0];
+    return asciiSel2_[0] > 0;
 }
-
+//подумать над тем, как бы отимизировать сие
 void byteLog::redoAsciiChoice(int sel, int *asel)
 {
-    int line = 0, sym = 0, avail = 0;
-    if (sel < 0)
-    {
-        avail = -1;
-    }
+    asel[0] = 1;
+    asel[1] = 0;
+    asel[2] = 0;
+
+    if (sel < 0) asel[0] = -1;
     else
     {
         for (int i = 0; i < sel; i++)
         {
-            sym++;
+            asel[2]++;
             if (data_[i] == '\n')
             {
-                line++;
-                sym = 0;
+                asel[1]++;
+                asel[2] = 0;
             }
         }
     }
-    asel[0] = avail;
-    asel[1] = line;
-    asel[2] = sym;
 }
 
 void byteLog::setSelectAll(bool sel)
@@ -173,12 +123,12 @@ bool byteLog::selectAll()
     return selectAll_;
 }
 
-int byteLog::ALNToBLN(int ALN) // ASCII Line Number to Byte Line Number
+int byteLog::ALNToBLN(int ALN)
 {
     return(FSIAS_[ALN] / lineSize_);
 }
 
-int byteLog::BLNToALN(int BLN) // Byte Line Number to ASCII Line Number
+int byteLog::BLNToALN(int BLN)
 {
     for (int i = 0; i < FSIASSize_; i++)
     {
@@ -192,15 +142,20 @@ int byteLog::BLNToALN(int BLN) // Byte Line Number to ASCII Line Number
 
 int byteLog::push(const unsigned char* data, int amt)
 {
-    if (amt > maximum_) return -1;
-    if (amt == 0) return 0;
-    if (FSIASSize_ == 0)
+    if (amt > lineSize_*lines_) return -1; // игнорируем всё, что больше лога
+    if (amt == 0) return 0; //Если класть нечего, то выходим из цикла
+    if (FSIASSize_ == 0) //Если FSIAS совершенно пуст, создаём хотя бы одну
+    //переменную в нём. Если информация не была забракована ранее, то что-то
+    //в лог будет положено, а значит минимум одна строка там точно будет.
+    //Следовательно, в FSIAS_ должна быть одна переменная.
     {
-        FSIAS_ = static_cast<int*>(malloc(sizeof(int)));
+        FSIAS_ = static_cast<int*>(realloc(FSIAS_, sizeof(int)));
         FSIASSize_++;
         FSIAS_[0] = 0;
     }
-    else
+    else //в противном случае смотрим, является ли последний символ лога '\n'.
+    // Если является, добавляем новую запись в FSIAS_ о том, что первый символ
+    // вталкиваемой информации начинает новую строку.
     {
         if(data_[size_-1] == '\n')
         {
@@ -209,36 +164,28 @@ int byteLog::push(const unsigned char* data, int amt)
             FSIAS_[FSIASSize_-1] = size_;
         }
     }
-    int tmpvl = FSIAS_[FSIASSize_-1];
-    for (int i = 1; i < amt; i++)
+    for (int i = 1; i < amt; i++) //добавляем в лог новые значения.
+    //Их считаем по вталкиваемым данным. Находим в data новые строки,
+    //прибавляем к их номеру текущий размер массива
+    if (data[i-1] == '\n')
     {
-        if (data[i-1] == '\n')
-        {
-//=================================
-            FSIASSize_++;
-            FSIAS_ = static_cast<int*>(realloc(FSIAS_, sizeof(int)*static_cast<size_t>(FSIASSize_)));
-            FSIAS_[FSIASSize_-1] = i+tmpvl;
-//=================================
-        }
+        FSIASSize_++;
+        FSIAS_ = static_cast<int*>(realloc(FSIAS_, sizeof(int)*static_cast<size_t>(FSIASSize_)));
+        FSIAS_[FSIASSize_-1] = i+size_;
     }
-    if (amt <= maximum_-size_)                                                      //если обрезать ничего не потребуется,
+    if (amt <= lineSize_*lines_-size_) //если обрезать ничего не потребуется,
     {
-        data_ = static_cast<unsigned char *>(realloc(data_,static_cast<size_t>(size_+amt)));     //расширяем массив с содержимым лога
+        data_ = static_cast<unsigned char *>(realloc(data_,static_cast<size_t>(size_+amt)));  //расширяем массив с содержимым лога
         memmove(data_+static_cast<size_t>(size_), data, static_cast<size_t>(amt));  //и кладём в конец новые данные
-        size_+=amt;                                                                 //увеличиваем размер на число новых значений
-
-
-
-        //updateFSIAS();
+        size_+=amt; //увеличиваем размер на число новых значений
         return 0;
     }
-
     else //если сдвигать всё же требуется
     {
         int shifts = amt / lineSize_;   //здесь учитываем, сколько сдвигов строк нам нужно
         int k = size_ % lineSize_;      //сколько в последней строке элементов и так находится
         int l = amt % lineSize_;        //сколько элементов в последней строке нового сообщения
-        if (k+l > lineSize_ || size_ == maximum_)            //Если суммарно элементов в последних строках оказалось больше, производим ещё один сдвиг
+        if (k+l > lineSize_ || size_ == lineSize_*lines_)            //Если суммарно элементов в последних строках оказалось больше, производим ещё один сдвиг
             shifts++;
         unsigned char* tmp = static_cast<unsigned char*>( malloc(static_cast<size_t>(size_ + amt - shifts * lineSize_)) ); //создаём такой же массив
         memmove(tmp, data_ + (shifts) * lineSize_, static_cast<size_t>(size_ - shifts * lineSize_)); //переносим туда лог, но без последних строк
@@ -254,10 +201,10 @@ int byteLog::push(const unsigned char* data, int amt)
         size_ += amt - shifts * lineSize_; //пересчитываем размер
         free(data_); //удаляем старый массив
         data_ = tmp; //меняем на новый
-        if (firstSel_ >= 0)
+        if (firstSel_ >= 0) //двигаем выбор, если таковой был.
         {
             firstSel_ -= shifts*lineSize_;
-            if (firstSel_ < 0)
+            if (firstSel_ < 0) //Если ушли в минус, выделяем нулевой символ.
                 firstSel_ = 0;
         }
         if (secondSel_ >= 0)
@@ -266,45 +213,52 @@ int byteLog::push(const unsigned char* data, int amt)
             if (secondSel_ < 0)
                 secondSel_ = 0;
         }
-        FSIASSize_ -= asciiShift_;
-        int *temp = static_cast<int*>(malloc(sizeof(int) * static_cast<size_t>(FSIASSize_)));
-        memmove(temp, FSIAS_+ asciiShift_, static_cast<size_t>(FSIASSize_));
-        //cout << "Copied! asciiShift = " << asciiShift_ <<", FSIASSize_ = " << FSIASSize_ << endl;
+        redoAsciiChoice(firstSel_, asciiSel1_);
+        redoAsciiChoice(secondSel_, asciiSel2_);
+        //Сдвигаем первые символы в строке.
+        //0.	Считаем кол-во уехавших символов, условно переменная sa
+        int sa = shifts * lineSize_;
+        //1.	Делаем счетчик
+        int cntr = 0;
+        //2.	В цикле сравниваем sa со СЛЕДУЮЩИМ значением элемента
+        for (int i = 0; i < FSIASSize_ - 1; i++)
+        {
+        //3.	Если СЛЕДУЮЩЕЕ значение больше, вычитаем из СЛЕДУЮЩЕГО значения sa.
+            if (FSIAS_[i+1] >= sa)
+                FSIAS_[i+1] -= sa;
+        //4.	Иначе увеличиваем счетчик
+            else
+            {
+                cntr++;
+                FSIAS_[i+1] -= sa;
+            }
+        }
+        //5.	Сдвигаем весь массив на число в счётчике
+        int *temp = static_cast<int*>(malloc(sizeof(int) * static_cast<size_t>(FSIASSize_ - cntr + 1 )));
+        memmove(temp, FSIAS_+ static_cast<size_t>(cntr) + (FSIAS_[1] == 1 ? 1 : 0), static_cast<size_t>(FSIASSize_ - cntr + 1 ) * sizeof(int));
         free(FSIAS_);
         FSIAS_ = temp;
-        //cout << "tmpval = " << FSIAS_[0] << endl;
-        int tmpval = FSIAS_[0];
-        //можно попробовать ускорить с помощью OpenMP.
-        for (int i = 0; i < FSIASSize_; i++)
-            FSIAS_[i]-=tmpval;
-        updateFSIAS();
+        FSIASSize_-=cntr;
+        //6.	Обнуляем первый элемент
+        FSIAS_[0] = 0;
         return shifts; //возвращаем число строк, на которые, в случае чего, требуется сдвинуть курсор
     }
 }
 
-unsigned char byteLog::get(int elementNum)
-{
-    if (elementNum >= size_)
-        return 0;
-    return(data_[elementNum]);
-}
-
-unsigned char* byteLog::getLine(int lineNum)
-{
-    unsigned char *buffer = static_cast<unsigned char*>(malloc(static_cast<size_t>(lineSize_+1)));
-    memmove(buffer, data_+lineNum*lineSize_, static_cast<size_t>(lineSize_));
-    if (lineNum < (size_ / lineSize_))
-        buffer[lineSize_] = '\n';
-    return buffer;
-}
-
 void byteLog::clear()
 {
+    //чистим лог
     free(data_);
     data_ = static_cast<unsigned char*>(malloc(0));
+    size_ = 0;
+    //чистим FSIAS_
+    free(FSIAS_);
     FSIAS_ = static_cast<int*>(malloc(0));
     FSIASSize_ = 0;
-    size_ = 0;
+    //чистим выделение
+    setFirstSel(-1);
+    setSecondSel(-1);
+
 }
 
 unsigned char* byteLog::data()
@@ -312,66 +266,60 @@ unsigned char* byteLog::data()
     return data_;
 }
 
-unsigned char byteLog::at(int pos)
-{
-    if (pos < 0 || pos >= size_)
-        return '\0';
-    return data_[pos];
-}
-
 int byteLog::asciiLines()
 {
     return FSIASSize_;
 }
 
-unsigned char* byteLog::asciiLine(int lineNum)
+unsigned char* byteLog::asciiLine(int lineNum) // Нумерация начинается с 1!
 {
-
     size_t pos1 = 0, pos2 = 0;
     unsigned char* ret;
-    if (lineNum > FSIASSize_ || size_ == 0 || FSIASSize_ == 0)
+    //Первая позиция - первый символ в указанной строке
+    pos1 = static_cast<size_t>(lineNum-1 < 0 ? 0 : FSIAS_[lineNum-1]);
+    //Вторая позиция - либо первый символ в следующей строке, либо, если
+    //такой нет, последний символ.
+    pos2 = static_cast<size_t>(lineNum < FSIASSize_ ? FSIAS_[lineNum] : size_);
+   /* Кидаем пустую строку в случае, если:
+    * - номер запрашиваемой строки больше, чем строк в логе есть в принципе
+    * - лог пустой
+    * - позиции получились равны между собой
+    * - первая позиция по какой-то причине стоит дальше второй
+    * - первая позиция больше, чем элементов в массиве. Вторую проверять
+    *   не имеет смысла, так как либо она ещё дальше, либо уже отсеялась
+    *   по предыдущему пункту
+    */
+    if (lineNum > FSIASSize_ || size_ == 0 || pos1 >= pos2 || static_cast<int>(pos1) > size_)
     {
         ret = static_cast<unsigned char*>(malloc(1));
         ret[0] = '\0';
         return ret;
     }
-    pos1 = static_cast<size_t>(FSIAS_[lineNum-1]);
-    if(FSIASSize_ <= lineNum)
-    {
-        pos2 = static_cast<size_t>(size_);
-    }
-    else
-    {
-         pos2 = static_cast<size_t>(FSIAS_[lineNum]);
-    }
+    //Иначе просто кидаем запрошенную строку.
     ret = static_cast<unsigned char*>(malloc(static_cast<size_t>(pos2-pos1)));
-    //cout << "==================="<<endl;
-    //cout << "FSIAS:" << endl;
-    //for(int i = 0; i < FSIASSize_; i++)
-    {
-        //cout << i + 1<< ":\t" << FSIAS_[i] << endl;
-    }
-    //cout << "==================="<<endl;
-    //cout << "pos1 = FSIAS_[" << lineNum-1 << "], pos2 = FSIAS_[" << lineNum << "], FSIASSize_ = " << FSIASSize_<< endl;
-    //cout << "pos1 = " << pos1 << ", pos2 = " << pos2 << endl;
     memmove(ret, data_+pos1, pos2-1-pos1);
-    ret[pos2-pos1-1] = '\0';
-    return ret;
+    ret[pos2-pos1-1] = '\0'; //Не забываем про EOL в конце, иначе выведется ещё и мусор
+    return ret; //Ещё раз: НАДО ВЫЗЫВАТЬ FREE ДЛЯ УКАЗАТЕЛЯ, КОТОРОМУ
+    //ПРИСВАИВАЕТСЯ ВОЗВРАЩАЕМОЕ ЗНАЧЕНИЕ!
 }
 
 int byteLog::asciiLineLen(int lineNum)
 {
-    if (lineNum >= FSIASSize_)
+    if (lineNum >= FSIASSize_) // у несуществующей строки длина 0
         return 0;
-    else
+    else //Существующих строк есть два типа
+    {
         if (lineNum < FSIASSize_-1)
-        {
+        //не последние - их длина считается, как номер первого символа в
+        //строке после текущей рассматриваемой (формулировка "следующей
+        //текущей рассматриваемой" была бы более корректной, но она немного
+        //путает) минус номер первого символа в текущей рассматриваемой строке.
             return (FSIAS_[lineNum+1] - FSIAS_[lineNum]);
-        }
         else
-        {
+        //последние - их длина считается, как размер массива минус
+        //номер первого символа в текущей рассматриваемой строке.
             return (size_ - FSIAS_[lineNum]);
-        }
+    }
 }
 
 int byteLog::getFirstSymInAsciiLine(int lineNum)
@@ -383,22 +331,27 @@ int byteLog::getFirstSymInAsciiLine(int lineNum)
 
 char* byteLog::getHighlighted()
 {
+    //смотрим, где начало и конец выделения
     int op = min(firstSel_, secondSel_);
     int ed = max(firstSel_, secondSel_)+1;
+    //Возвращаем всё, что находится между ними
     char* rt = static_cast<char*>(malloc(static_cast<size_t>(ed-op+1)*sizeof(char)));
     memcpy(rt,data_+op, static_cast<size_t>(ed-op));
-    rt[ed-op] = '\0';
-    return rt;
+    rt[ed-op] = '\0'; //EOL не забываем
+    return rt; //И СНОВА ПОВТОРЯЮ, ВЫЗЫВАЙТЕ FREE ДЛЯ ТОГО УКАЗАТЕЛЯ, КОТОРОМУ
+    //ПРИСВАИВАЕТЕ ЭТО ЗНАЧЕНИЕ!
 }
 
 char* byteLog::getData(int first, int last)
 {
+    //Определяем начало и конец запрошенного.
     int op = min(first, size_);
     int ed = min(last, size_)+1;
+    //Выделяем память
     char* rt = static_cast<char*>(malloc(static_cast<size_t>(ed-op+1)*sizeof(char)));
     memcpy(rt,data_+op, static_cast<size_t>(ed-op));
-    rt[ed-op] = '\0';
-    return rt;
+    rt[ed-op] = '\0'; //EOL, опять
+    return rt; //Я знаю, что вам надоело это читать, НО FREE!
 }
 
 int byteLog::linesAmt()
@@ -426,24 +379,29 @@ byteLog::~byteLog()
     free(FSIAS_);
 }
 
-void byteLog::updateFSIAS()
+bool byteLog::isInSeq(int symNum, char* seq, int len)
 {
-    free(FSIAS_);
-    FSIASSize_ = 1;
-    FSIAS_ = static_cast<int*>(malloc(sizeof(int)));
-    FSIAS_[0] = 0;
-    if (size_ > 0)
-    {
-        for (int i = 1; i < size_; i++)
+    //Идём по последовательности и пытаемся найти в ней проверяемую букву
+    for (int i = 0; i < len; i++)
+        if (data_[symNum] == seq[i] && symNum - i >= 0 && symNum + len - i < size_)
+        //если нашли, и при этом под последовательность есть место
         {
-            if (data_[i-1] == '\n')
+            //проверяем каждый символ в последовательности на предмет
+            //совпадения. Если хоть один не совпал, то проверяем
+            //последовательность дальше. Если нет, возвращаем true
+            bool isCorrect = true;
+            for (int j = 0; j < len ; j++)
             {
-                FSIASSize_++;
-                FSIAS_ = static_cast<int*>(realloc(FSIAS_, FSIASSize_*sizeof(int)));
-                FSIAS_[FSIASSize_-1] = i;
+                if (!(seq[j] == data_[symNum - i + j] || (seq[j] == ' ' &&
+                    (data_[symNum - i + j] == '\n' || data_[symNum - i + j] == '\r'))))
+                {
+
+                    isCorrect = false;
+                    break;
+                }
             }
+            if (isCorrect == true)
+                return true;
         }
-
-    }
-
+    return false;
 }

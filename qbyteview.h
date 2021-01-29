@@ -1,6 +1,11 @@
 #ifndef QBYTEVIEW_H
 #define QBYTEVIEW_H
 
+/*
+ * Собственно, виджет. Подключать надо
+ * именно этот файл!
+ */
+
 #include <QMouseEvent>
 
 #include <QWidget>
@@ -22,6 +27,7 @@
 #include <QTextStream>
 #include <QThread>
 #include <QBrush>
+#include <QByteArray>
 #include "bytelog.h"
 #include "custgview.h"
 
@@ -35,31 +41,44 @@ protected:
     QHBoxLayout* mainLayout;
     QGraphicsScene* data;
     custGView* dataView;
-    QGraphicsSimpleTextItem**matrix;
-    QGraphicsSimpleTextItem**asciiMatrix;
+    QGraphicsSimpleTextItem**matrix; //Для байтового предст.
+    QGraphicsSimpleTextItem**asciiMatrix; //Для текстового предст.
     QFont fnt;
-    QTimer* resizeTimer,* updateTimer;
-    bool wasResized;
-    bool shouldUpdate;
-    bool shouldRewrite;
-    int shiftsCnt;
-    int asciiShiftsCnt;
-    bool isTextDisplayed_;
-    bool enableHighlight;
-    bool chooseFirst;
-    byteLog* log;
-    unsigned char* buf_;
-    int bsize_;
-    bool viewRaw_;
-    int pointSys_;
-    int linesAmt_;
-    int bytesInLine_;
-    int shifts;
-    int lineSz;
-    int dispLines_;
+    /*
+     * при изменении размеров окна происходит
+     * полная перерисовка сцены. Процесс затяжной, поэтому перерисовывание
+     * при каждом масштабировании может привести к достаточно неприятным
+     * коллизиям. Чтобы этого не происходило, перерисовка запускается
+     * по таймеру, а ивент на масштабирование как раз и указывает, надо
+     * ли в следующий раз при срабатывании таймера перерисовывать сцену.
+     */
+    QTimer *resizeTimer;
+    /*
+     * Перерисовка при загрузке новых значений или при использовани
+     * скроллбара - процедура очень затратная и зависящая от размера
+     * виджета. Поэтому кол-во миллисекунд до таймаута равно высоте виджета
+     * в пикселях. Размер таймаута обновляется со срабатыванием предыдущего таймера.
+     */
+    QTimer *updateTimer;
+    //Что подсвечивать при поиске
+    QByteArray searchQuery;
+    bool wasResized;//true - при следующем таймауте resizeTimer виджет будет перерисован.
+    bool shouldUpdate;//true - при следующем таймауте updateTimer текст в виджете будет переписан.
+    bool shouldRewrite; //true - при следующем таймауте updateTimer виджет будет перерисован.
+    int shiftsCnt; // число сдвигов в байтовом представлении, чтобы знать, насколько сдвигать
+                   //скроллбар при следующей отрисовке
+    int asciiShiftsCnt;// число сдвигов в текстовом представлении, чтобы знать, насколько сдвигать
+                       //скроллбар при следующей отрисовке
+    bool isTextDisplayed_; //True - текстовое представление. False - байтовое.
+    bool enableHighlight;  //True - ползователь может выделять текст. False - не может.
+    bool chooseFirst; //True - пользователь выбирает первый элемент. False - второй.
+    byteLog* log; //Тут будем хранить данные.
+    int linesAmt_; //максимум строк в байтовом представлении
+    int lineSz; //размер байтовой строки
+    int dispLines_; //Число видимых (отрисовываемых) строк
 
-    void redraw();
-    void rewrite();
+    void redraw(); //перерисовывает ascii либо hex представление целиком
+    void rewrite();//переписывает информацию в ascii либо hex представлении
 
     void redrawHex();
     void rewriteHex();
@@ -71,10 +90,20 @@ protected:
     void contextMenuEvent( QContextMenuEvent * e );
     void mousePressEvent(QMouseEvent *event);
 public:
-    QByteView(int linesAmt, QGroupBox *parent = 0);
+    QByteView(int linesAmt, QGroupBox *parent = nullptr);
+    /*
+     * Максимальное количество строк по 20 символов -
+     * 835575.
+     */
 
 //================================================================
 //================================================================
+
+    /*
+     * _______________________
+     * |        ВИД          |
+     * =======================
+     */
 
     void switchViews();
     /*
@@ -88,21 +117,10 @@ public:
      * или false - если выведено байтовое представление.
      */
 
-    bool isRawDisplayed();
+    int bytesInLine();
     /*
-     * Вернёт true, если выведено байтовое представление,
-     * или false - если выведено текстовое представление.
-     */
-
-    void setMaxLines(int maxLines, int bytesInLine_ = 20);
-    /*
-     * Настраивает кол-во элементов для байтового представления.
-     * bytesInLine_ лучше пока не менять.
-     */
-
-    void clear();
-    /*
-     * Очищает лог.
+     * Возвращает максимально возможное число байтов в строке (в байтовом
+     * представлении) лога.
      */
 
     int linesAmt();
@@ -110,10 +128,23 @@ public:
      * Возвращает число заполненных строк (в байтовом представлении) лога.
      */
 
-    int bytesInLine();
     /*
-     * Возвращает максимально возможное число байтов в строке (в байтовом
-     * представлении) лога.
+     * _______________________
+     * |       ДАННЫЕ        |
+     * =======================
+     */
+
+    void setMaxLines(int maxLines, int bytesInLine_ = 20);
+    /*
+     * Настраивает кол-во элементов для байтового представления.
+     * bytesInLine_ менять не надо.
+     * Максимальное количество строк по 20 символов -
+     * 835575.
+     */
+
+    void clear();
+    /*
+     * Очищает лог.
      */
 
     void putData(const QByteArray & arr);
@@ -133,7 +164,8 @@ public:
 
     QString getQString();
     /*
-     * Возвращает данные из лога в виде QString.
+     * Возвращает данные из лога
+     * в виде QString.
      */
 
     void exportSelected(int first = -1, int last = -1);
@@ -147,25 +179,53 @@ public:
      * по указателям из лога. Если в логе при этом значение
      * одной из двух меток будет меньше нуля,
      * не экспортируется ничего.
-     *
      */
+
+    /*
+     * _______________________
+     * |        ПОИСК        |
+     * =======================
+     */
+
+    int search(QByteArray query);
+    /*
+     * Ищет фразы по запросу и подсвечивает их.
+     * символы \r и \n при поиске считаются за пробелы.
+     * То есть, для подсветки того, что отмечено
+     * квадратными скобками
+     * some data 1
+     * some da[ta 2
+     * so]me data 3
+     * можно искать "ta 2  so" - между '2' и 's' два
+     * пробела.
+     */
+
 //================================================================
 //================================================================
 
     ~QByteView();
 protected slots:
-    void scrMoved(int);
-    void ShowContextMenu(const QPoint &pos);
-    void slotSwitchViews();
-    void slotClear();
-    void slotCopy();
-    void slotChooseFirst();
-    void slotChooseSecond();
-    void slotScrDwn();
-    void slotGoToHighlighted();
-    void slotEnableHighlighting();
-    void slotExportSelected();
-    void slotSelectAll();
+    void scrMoved(int); //Слот для скроллбара. При его перемещении
+    //shouldUpdate становится true.
+    //============================================================
+    //                    КОНТЕКСТНОЕ МЕНЮ
+    //============================================================
+    void slotSwitchViews(); //вызывает switchViews()
+    void slotClear(); //вызывает switchViews()
+    void slotCopy(); //копирует выделенный текст
+    void slotChooseFirst(); //chooseFirst становится true
+    void slotChooseSecond(); //chooseFirst становится false
+    void slotScrDwn(); //присваивает скроллбару максимальное
+    //значение и переписывает текст
+    void slotGoToHighlighted(); // двигает скроллбар к первому
+    //выделенному элементу
+    void slotEnableHighlighting(); //включает/отключает выделение
+    //посредством enableHighlight
+    void slotExportSelected(); //вызывает exportSelected()
+    void slotSelectAll(); //включает/отключает режим "выбрать
+    //всё". При выделении пользователем одного из элементов режим
+    //отключается.
+    //============================================================
     void slotResizeTimeout();
     void slotUpdateTimeout();
 };
