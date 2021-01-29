@@ -26,19 +26,21 @@ CONFIG += c++11
 SOURCES += \
         main.cpp \
         mainwindow.cpp \
-    qhexview.cpp \
     comport_wgt.cpp \
     qbyteview.cpp \
     bytelog.cpp \
-    custgview.cpp
+    custgview.cpp \
+    srch.cpp
 
 HEADERS += \
         mainwindow.h \
-    qhexview.h \
     comport_wgt.h \
     qbyteview.h \
     bytelog.h \
-    custgview.h
+    custgview.h \
+    srch.h
+
+
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

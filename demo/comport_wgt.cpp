@@ -87,9 +87,7 @@ void ComPortWgt::read_from_com ( )
 {
     QByteArray by ;
     by.append ( m_serial -> readAll ( ) ) ;
-    //m_serial -> clear ( ) ;
     emit send_data_from_com ( by ) ;
-
 }
 
 QString ComPortWgt::get_name ( )
