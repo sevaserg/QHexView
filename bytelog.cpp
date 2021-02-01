@@ -91,26 +91,25 @@ bool byteLog::asciiSel2Active()
 {
     return asciiSel2_[0] > 0;
 }
-//подумать над тем, как бы отимизировать сие
+
 void byteLog::redoAsciiChoice(int sel, int *asel)
 {
-    asel[0] = 1;
-    asel[1] = 0;
-    asel[2] = 0;
+    asel[0] = 1; //Активен ли
+    asel[1] = 0; //Номер строки
+    asel[2] = 0; //Номер символа в строке
 
-    if (sel < 0) asel[0] = -1;
+    if (sel < 0 || sel >= size_) asel[0] = -1; //Если номер символа меньше нуля
+    //или больше числа символов (то есть нет такого номера), выделение
+    //перестаёт быть активным. Проще говоря, чтобы снять выделение, шлём sel,
+    //равный -1
     else
-    {
-        for (int i = 0; i < sel; i++)
-        {
-            asel[2]++;
-            if (data_[i] == '\n')
+        for (int i = 0; i < FSIASSize_; i++)
+            if ((FSIAS_[i] <= sel && FSIAS_[i+1] > sel) || i == FSIASSize_-1)
             {
-                asel[1]++;
-                asel[2] = 0;
+                asel[1] = i;
+                asel[2] = sel - FSIAS_[i];
+                break;
             }
-        }
-    }
 }
 
 void byteLog::setSelectAll(bool sel)
