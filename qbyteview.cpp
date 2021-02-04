@@ -183,7 +183,7 @@ void QByteView::redrawHex()
             dscroller->setValue(dscroller->maximum());
     }
     lineSz = 20;
-    dispLines_ = this->height()/20 - 1;
+    dispLines_ = this->height()/20 - 2;
     //переназначаем максимум скроллбара
     scroller->setMaximum(max(log->linesAmt() - dispLines_ + 1, 0));
     //создаём и размещаем элементы по новой
