@@ -40,6 +40,7 @@ private:
     // 0 - активен выбор или нет
     // 1 - строка
     // 2 - номер элемента
+    int maxAsciiLine;
     int *asciiSel2_; //выбор второго элемента.
 public:
     // Конструктор. Без комментариев.
@@ -105,6 +106,7 @@ public:
     char* getData(int first, int last);
     //Возвращает число строк
     int linesAmt();
+    int maxAsciiLineLen();
     //Возвращает число ASCII-строк
     int asciiLines();
     //Возвращает номер первого символа в ASCII-строке номер lineNum

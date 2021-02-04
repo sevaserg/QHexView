@@ -15,6 +15,7 @@ byteLog::byteLog()
     asciiSel2_ = new int[3];
     asciiSel1_[0] = -1;
     asciiSel2_[0] = -1;
+    maxAsciiLine = 0;
 }
 
 int byteLog::size()
@@ -174,6 +175,8 @@ int byteLog::push(const unsigned char* data, int amt)
         FSIASSize_++;
         FSIAS_ = static_cast<int*>(realloc(FSIAS_, sizeof(int)*static_cast<size_t>(FSIASSize_)));
         FSIAS_[FSIASSize_-1] = i+size_;
+        if (FSIAS_[FSIASSize_-1] - FSIAS_[FSIASSize_-2] > maxAsciiLine)
+            maxAsciiLine = FSIAS_[FSIASSize_-1] - FSIAS_[FSIASSize_-2];
     }
     if (amt <= lineSize_*lines_-size_) //если обрезать ничего не потребуется,
     {
@@ -223,6 +226,7 @@ int byteLog::push(const unsigned char* data, int amt)
         //1.	Делаем счетчик
         int cntr = 0;
         //2.	В цикле сравниваем sa со СЛЕДУЮЩИМ значением элемента
+        maxAsciiLine = 0;
         for (int i = 0; i < FSIASSize_ - 1; i++)
         {
         //3.	Если СЛЕДУЮЩЕЕ значение больше, вычитаем из СЛЕДУЮЩЕГО значения sa.
@@ -234,6 +238,8 @@ int byteLog::push(const unsigned char* data, int amt)
                 cntr++;
                 FSIAS_[i+1] -= sa;
             }
+            if (FSIAS_[i+1] - FSIAS_[i] > maxAsciiLine)
+                maxAsciiLine = FSIAS_[i+1] - FSIAS_[i];
         }
         //5.	Сдвигаем весь массив на число в счётчике
         int *temp = static_cast<int*>(malloc(sizeof(int) * static_cast<size_t>(FSIASSize_ - cntr + 1 )));
@@ -245,6 +251,11 @@ int byteLog::push(const unsigned char* data, int amt)
         FSIAS_[0] = 0;
         return shifts; //возвращаем число строк, на которые, в случае чего, требуется сдвинуть курсор
     }
+}
+
+int byteLog::maxAsciiLineLen()
+{
+    return maxAsciiLine;
 }
 
 void byteLog::clear()

@@ -40,8 +40,9 @@ private:
 
 protected:
 
-    QScrollBar  *hscroller, *vscroller, *scroller;
+    QScrollBar *scroller, *dscroller;
     QHBoxLayout* mainLayout;
+    QVBoxLayout* dataLayout;
     QGraphicsScene* data;
     custGView* dataView;
     QString dir;

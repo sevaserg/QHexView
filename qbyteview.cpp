@@ -21,24 +21,27 @@ QByteView::QByteView(int linesAmt, QGroupBox *parent) : QGroupBox ( parent )//Po
     mainLayout = new QHBoxLayout;
     mainLayout->setMargin(0);
     log = new byteLog;
-
-    vscroller = new QScrollBar;
-    hscroller = new QScrollBar;
     scroller = new QScrollBar;
     scroller->setMaximum(0);
     connect(scroller, SIGNAL(valueChanged(int)), this, SLOT(scrMoved(int)));
+    dscroller = new QScrollBar;
+    dscroller->setOrientation(Qt::Horizontal);
+    connect(dscroller, SIGNAL(valueChanged(int)), this, SLOT(scrMoved(int)));
     data = new QGraphicsScene;
     dataView = new custGView;
     dataView->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     dataView->setScene(data);
     dataView->initRect();
-    dataView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+    dataView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     dataView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     dataView->setMouseTracking(true);
+    dataLayout = new QVBoxLayout;
+    dataLayout->addWidget(dataView);
+    dataLayout->addWidget(dscroller);
     linesAmt_ = linesAmt;
     lineSz = 20;
     log->setMax(linesAmt_, lineSz);
-    mainLayout->addWidget(dataView);;
+    mainLayout->addLayout(dataLayout);
     isTextDisplayed_ = true;
     mainLayout->addWidget(scroller);
     this->setLayout(mainLayout);
@@ -51,7 +54,8 @@ QByteView::QByteView(int linesAmt, QGroupBox *parent) : QGroupBox ( parent )//Po
         matrix[i] = new QGraphicsTextItem[20];
     }
     this->show();
-    this->setMinimumWidth(300);
+    this->setMinimumWidth(200);
+    this->setMinimumHeight(100);
     wasResized = false;
     updateTimer = new QTimer;
     resizeTimer = new QTimer;
@@ -80,11 +84,11 @@ void QByteView::rewriteHex()
     {
         for (int j = 0; j < lineSz; j++)
         {
-                if (log->size() > lineSz*(scroller->value()+i)+j) //если в данной
+                if (log->size() > lineSz*(scroller->value()+i)+j + dscroller->value()) //если в данной
                 //позиции+смещении скроллбара существует символ, то пишем и пытаемся его
                 //выделить.
                 {
-                    int curElem = lineSz*(scroller->value()+i)+j;
+                    int curElem = lineSz*(scroller->value()+i)+j + dscroller->value();
                     bool isinseq= log->isInSeq(curElem, searchQuery.data(), searchQuery.length());
                     bool ishighlighted = false;
                     //Ниже - отвратительно длинный иф.
@@ -148,9 +152,7 @@ void QByteView::rewriteHex()
                     if (dataView->width() > 750)
                         asciiMatrix[i][j].setHtml(QString("<div style='background-color:white; font-family:Courier New; color:black;'>" ) + "?</div>");
                     matrix[i][j].setHtml("<div style='background-color:white; font-family:Courier New;color:black;'>?? </div>");
-
                 }
-
         }
     }
 }
@@ -165,10 +167,21 @@ void QByteView::redrawHex()
     }
     delete[]matrix;
     delete[]asciiMatrix;
-    dataView->clear(); //очищаем област
+    dataView->clear(); //очищаем область
     data->clear();
     dataView->switchViews(false);
     int offset = 600, strOffset = 0;
+    if (dataView->width() > offset)
+    {
+        dscroller->setMaximum(0);
+    }
+    else
+    {
+        int v = dscroller->value();
+        dscroller->setMaximum(20-this->width()/30);
+        if (v >= dscroller->maximum())
+            dscroller->setValue(dscroller->maximum());
+    }
     lineSz = 20;
     dispLines_ = this->height()/20 - 1;
     //переназначаем максимум скроллбара
@@ -210,29 +223,30 @@ void QByteView::rewriteAscii()
         for (int j = 0; j < lineSz; j++)
         {
             bool isinseq = searchQuery.length() > 0 && log->isInSeq(log->getFirstSymInAsciiLine(scroller->value()+i-((log->asciiLineLen(0) == 0) ? 0 : 1) + 1)+j, searchQuery.data(), searchQuery.length());
-            if (j < d.length())
+            if (j+dscroller->value() < d.length())
             {
+                int k = j+dscroller->value();
                 asciiMatrix[i][j].setTextWidth(20);
-                asciiMatrix[i][j].setHtml("<div style='background-color:white; font-family:Courier New; height:20;"+ QString(isinseq ? "color:#FF4000;'>" : "color:black;'>" ) + QString(d.at(j)) + "</div>");
+                asciiMatrix[i][j].setHtml("<div style='background-color:white; font-family:Courier New; height:20;"+ QString(isinseq ? "color:#FF4000;'>" : "color:black;'>" ) + QString(d.at(k)) + "</div>");
                 if (log->asciiSel1Active() && log->asciiSel2Active())
                 {
                     if((scroller->value() + i  > log->asciiSel1Line() && scroller->value() + i  < log->asciiSel2Line()) || (scroller->value() + i  > log->asciiSel2Line() && scroller->value() + i  < log->asciiSel1Line()))
                     {
-                        asciiMatrix[i][j].setHtml(QString("<div style='background-color:blue; font-family:Courier New;") + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(j)) + "</div>");
+                        asciiMatrix[i][j].setHtml(QString("<div style='background-color:blue; font-family:Courier New;") + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(k)) + "</div>");
                     }
                     if (log->asciiSel1Line() < log->asciiSel2Line())
                     {
                         if (scroller->value() + i  == log->asciiSel1Line())
                         {
 
-                            if (j > log->asciiSel1Sym())
-                                asciiMatrix[i][j].setHtml(QString("<div style='background-color:blue; font-family:Courier New;") + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(j)) + "</div>");
+                            if (k > log->asciiSel1Sym())
+                                asciiMatrix[i][j].setHtml(QString("<div style='background-color:blue; font-family:Courier New;") + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(k)) + "</div>");
 
                         }
                         if (scroller->value() + i  == log->asciiSel2Line())
                         {
-                            if (j < log->asciiSel2Sym())
-                            asciiMatrix[i][j].setHtml(QString("<div style='background-color:blue;font-family:Courier New;") + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(j)) + "</div>");
+                            if (k < log->asciiSel2Sym())
+                            asciiMatrix[i][j].setHtml(QString("<div style='background-color:blue;font-family:Courier New;") + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(k)) + "</div>");
 
                         }
                     }
@@ -240,14 +254,14 @@ void QByteView::rewriteAscii()
                     {
                         if (scroller->value() + i  == log->asciiSel1Line())
                         {
-                            if (j < log->asciiSel1Sym())
-                                asciiMatrix[i][j].setHtml("<div style='background-color:blue; font-family:Courier New;" + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(j)) + "</div>");
+                            if (k < log->asciiSel1Sym())
+                                asciiMatrix[i][j].setHtml("<div style='background-color:blue; font-family:Courier New;" + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(k)) + "</div>");
 
                         }
                         if (scroller->value() + i  == log->asciiSel2Line())
                         {
-                            if (j > log->asciiSel2Sym())
-                                asciiMatrix[i][j].setHtml("<div style='background-color:blue; font-family:Courier New;" + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(j)) + "</div>");
+                            if (k > log->asciiSel2Sym())
+                                asciiMatrix[i][j].setHtml("<div style='background-color:blue; font-family:Courier New;" + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(k)) + "</div>");
 
                         }
                     }
@@ -255,24 +269,24 @@ void QByteView::rewriteAscii()
                     {
                         if (scroller->value() + i  == log->asciiSel1Line())
                         {
-                            if ((j > log->asciiSel2Sym() && j < log->asciiSel1Sym()) || (j < log->asciiSel2Sym() && j > log->asciiSel1Sym()))
-                                 asciiMatrix[i][j].setHtml("<div style='background-color:blue; font-family:Courier New;" + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(j)) + "</div>");
+                            if ((k > log->asciiSel2Sym() && k < log->asciiSel1Sym()) || (k < log->asciiSel2Sym() && k > log->asciiSel1Sym()))
+                                 asciiMatrix[i][j].setHtml("<div style='background-color:blue; font-family:Courier New;" + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(k)) + "</div>");
                         }
                     }
                 }
                 if (log->asciiSel1Active())
                 {
-                    if (scroller->value() + i == log->asciiSel1Line() && j == log->asciiSel1Sym())
+                    if (scroller->value() + i == log->asciiSel1Line() && k == log->asciiSel1Sym())
                     {
-                        asciiMatrix[i][j].setHtml("<div style='background-color:blue;font-family:Courier New;" + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(j)) + "</div>");
+                        asciiMatrix[i][j].setHtml("<div style='background-color:blue;font-family:Courier New;" + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(k)) + "</div>");
 
                     }
                 }
                 if (log->asciiSel2Active())
                 {
-                    if (scroller->value() + i == log->asciiSel2Line() && j == log->asciiSel2Sym())
+                    if (scroller->value() + i == log->asciiSel2Line() && k == log->asciiSel2Sym())
                     {
-                        asciiMatrix[i][j].setHtml("<div style='background-color:blue; font-family:Courier New;" + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(j)) + "</div>");
+                        asciiMatrix[i][j].setHtml("<div style='background-color:blue; font-family:Courier New;" + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(k)) + "</div>");
 
                     }
                 }
@@ -319,6 +333,7 @@ void QByteView::redrawAscii()
             asciiMatrix[i][j].moveBy(strOffset+8*j-4, 20*i-4);
         }
     }
+    dscroller->setMaximum(max(0, log->maxAsciiLineLen() - this->width()/8+2));
     dataView->initRect();
     dataView->printRects();
     rewriteAscii();
@@ -435,6 +450,8 @@ void QByteView::putData(const QByteArray & arr)
             log->setFirstSel(0);
             log->setSecondSel(log->size() - 1);
         }
+        if(isTextDisplayed_)
+            dscroller->setMaximum(max(0, log->maxAsciiLineLen() - this->width()/8+2));
         shouldRewrite = true;
 }
 
@@ -466,14 +483,14 @@ QByteView::~QByteView()
     delete[]matrix;
     delete[]asciiMatrix;
     dataView->clear();
-    delete mainLayout;
     delete dataView;
     delete data;
     delete scroller;
-    delete vscroller;
-    delete hscroller;
     delete log;
     delete updateTimer;
+    delete dscroller;
+    delete dataLayout;
+    delete mainLayout;
 }
 
 int QByteView::search(QByteArray query)
@@ -678,10 +695,11 @@ void QByteView::mousePressEvent(QMouseEvent *event)
         int cl = static_cast<int>(dataView->getX());
         int elNum;
         if (isTextDisplayed_)
-            elNum = log->getFirstSymInAsciiLine(scroller->value() + rw) + min(log->asciiLineLen(scroller->value() + rw), cl);
+            elNum = log->getFirstSymInAsciiLine(scroller->value() + rw) + min(log->asciiLineLen(scroller->value() + rw), cl+dscroller->value());
         else
-            elNum = static_cast<int>((scroller->value() + rw) * 20 + cl);
-        if (cl <= log->asciiLineLen(scroller->value() + rw) && enableHighlight)
+            elNum = static_cast<int>((scroller->value() + rw) * 20 + cl + dscroller->value());
+
+        if (enableHighlight)
         {
             if (isShiftPressed)
             {
