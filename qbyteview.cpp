@@ -1,13 +1,17 @@
 #include "qbyteview.h"
+
 #include <iostream>
 using namespace std;
 
 QByteView::QByteView(int linesAmt, QGroupBox *parent) : QGroupBox ( parent )//PointSys = 16, linesAmt = 10000, bytesInLine = 16
 {
+    dir = "./";
+
     searchQuery.clear();
     setMouseTracking(true);
     shouldUpdate = false;
     shouldRewrite = false;
+    isShiftPressed = false;
     fnt.setFamily("Courier New");
     fnt.setPixelSize(11);
 
@@ -28,29 +32,26 @@ QByteView::QByteView(int linesAmt, QGroupBox *parent) : QGroupBox ( parent )//Po
     dataView->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     dataView->setScene(data);
     dataView->initRect();
-    dataView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    dataView->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
     dataView->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     dataView->setMouseTracking(true);
     linesAmt_ = linesAmt;
     lineSz = 20;
     log->setMax(linesAmt_, lineSz);
-    //cout << "max lines: " << log->maxLines();
-    connect(this, SIGNAL(customContextMenuRequested(const QPoint &)),
-            this, SLOT(ShowContextMenu(const QPoint &)));
     mainLayout->addWidget(dataView);;
     isTextDisplayed_ = true;
     mainLayout->addWidget(scroller);
     this->setLayout(mainLayout);
     dataView->printRects();
-    asciiMatrix = new QGraphicsSimpleTextItem*[dispLines_];
-    matrix = new QGraphicsSimpleTextItem*[dispLines_];
+    asciiMatrix = new QGraphicsTextItem*[dispLines_];
+    matrix = new QGraphicsTextItem*[dispLines_];
     for (int i = 0; i < dispLines_; i++)
     {
-        asciiMatrix[i] = new QGraphicsSimpleTextItem[20];
-        matrix[i] = new QGraphicsSimpleTextItem[20];
+        asciiMatrix[i] = new QGraphicsTextItem[20];
+        matrix[i] = new QGraphicsTextItem[20];
     }
     this->show();
-    this->setMinimumWidth(780);
+    this->setMinimumWidth(300);
     wasResized = false;
     updateTimer = new QTimer;
     resizeTimer = new QTimer;
@@ -79,94 +80,77 @@ void QByteView::rewriteHex()
     {
         for (int j = 0; j < lineSz; j++)
         {
-            {
                 if (log->size() > lineSz*(scroller->value()+i)+j) //если в данной
                 //позиции+смещении скроллбара существует символ, то пишем и пытаемся его
                 //выделить.
                 {
-                int curElem = lineSz*(scroller->value()+i)+j;
-                QString str = "";
-                unsigned char info =((log->data()[curElem]));
-                if (log->isInSeq(curElem, searchQuery.data(), searchQuery.length()))//Если лежит в последовательности, красим в оранжевый.
-                {
-                    if (asciiMatrix[i][j].brush() !=QBrush(QColor(0xff, 0x9b, 0, 255)))
-                        asciiMatrix[i][j].setBrush(QBrush(QColor(0xff, 0x9b, 0, 255)));
-                    if (matrix[i][j].brush() !=QBrush(QColor(0xff, 0x9b, 0, 255)))
-                        matrix[i][j].setBrush(QColor(0xff, 0x9b, 0, 255));
-                }
-                else
-                {
+                    int curElem = lineSz*(scroller->value()+i)+j;
+                    bool isinseq= log->isInSeq(curElem, searchQuery.data(), searchQuery.length());
+                    bool ishighlighted = false;
                     //Ниже - отвратительно длинный иф.
                     if
                     (
                         (
                             (
                             //Если текущий элемент лежит между минимумом и максимумом (не включительно) выделенного
-                                (curElem > min(log->firstSel(), log->secondSel()))
+                                (curElem >= min(log->firstSel(), log->secondSel()))
                                 &&
-                                (curElem < max(log->firstSel(), log->secondSel()))
+                                (curElem <= max(log->firstSel(), log->secondSel()))
                             )
                             //и при этом оба выделения больше нуля
                             &&
                             (log->firstSel() >= 0 && log->secondSel() >= 0)
                         )
-                    )//красим букву, если она уже не окрашена, в красный.
+                        ||
+                        (
+                             log->firstSel() >= 0
+                             &&
+                             curElem == log->firstSel()
+                        )
+                        ||
+                        (
+                             log->secondSel() >= 0
+                             &&
+                             curElem == log->secondSel()
+                        )
+                    )//выделяем
                     {
-                        if (asciiMatrix[i][j].brush() != QBrush(Qt::red))
-                            asciiMatrix[i][j].setBrush(QBrush(Qt::red));
-                        if (matrix[i][j].brush() != QBrush(Qt::red))
-                            matrix[i][j].setBrush(QBrush(Qt::red));
+                        ishighlighted = true;
                     }
-                    else if (curElem == log->firstSel()) //Если это первый выделенный элемент, красим в зелёный
+
+                    QString str = "";
+                    unsigned char info =((log->data()[curElem]));
+                    if (dataView->width() > 750)
                     {
-                        if (asciiMatrix[i][j].brush() != QBrush(Qt::green))
-                            asciiMatrix[i][j].setBrush(QBrush(Qt::green));
-                        if (matrix[i][j].brush() != QBrush(Qt::green))
-                            matrix[i][j].setBrush(QBrush(Qt::green));
+                        if (info >= 32 && info < 127) //Если символ видимый, то печатаем его в ASCII-представление
+                        {
+                            //asciiMatrix[i][j].setHtml(QString("<div style='background-color:") + QString(ishighlighted ? "blue;" : "white;")+ QString("font-family:Courier New;") + QString(isinseq ? "color:#FF4000;'>" : ishighlighted ? "color:white;'>": "color:black;'>" ) + QString(static_cast<char>(info)) + "</div>");
+                            if (info == ' ') //Если символ видимый, то печатаем его в ASCII-представление
+                                asciiMatrix[i][j].setHtml(QString("<div style='background-color:") + QString(ishighlighted ? "blue;" : "white;")+ QString("font-family:Courier New;") + QString(ishighlighted ? "color:blue;'>": "color:white;'>" ) +  "_</div>");
+                            else
+                                asciiMatrix[i][j].setHtml(QString("<div style='background-color:") + QString(ishighlighted ? "blue;" : "white;")+ QString(" font-family:Courier New;") + QString(isinseq ? "color:#FF4000;'>" : ishighlighted ? "color:white;'>": "color:black;'>" ) + QString(static_cast<char>(info)) + "</div>");
+
+                        }
+                        else //если нет, вместо него печатаем точку
+                        {
+                            asciiMatrix[i][j].setHtml(QString("<div style='background-color:") + QString(ishighlighted ? "blue;" : "white;")+ QString(" font-family:Courier New;") + QString(isinseq ? "color:#FF4000;'>" : ishighlighted ? "color:white;'>": "color:black;'>")+QString(".</div>"));
+                        }
                     }
-                    else if (curElem == log->secondSel())//Если это второй выделенный элемент, красим в голубой
+                    for (int i = 0; i < 2;i++) //Пишем в байтовое представление
                     {
-                        if (asciiMatrix[i][j].brush() != QBrush(Qt::cyan))
-                            asciiMatrix[i][j].setBrush(QBrush(Qt::cyan));
-                        if (matrix[i][j].brush() != QBrush(Qt::cyan))
-                            matrix[i][j].setBrush(QBrush(Qt::cyan));
+                        str = alphabet[info%16]+str;
+                        info /= 16;
                     }
-                    else //В противном случае красим в скучный серый
-                    {
-                        if (asciiMatrix[i][j].brush() != QBrush(Qt::black))
-                            asciiMatrix[i][j].setBrush(QBrush(Qt::black));
-                        if (matrix[i][j].brush() != QBrush(Qt::black))
-                            matrix[i][j].setBrush(QBrush(Qt::black));
-                    }
-                }
-                if (info >= 32 && info < 127) //Если символ видимый, то печатаем его в ASCII-представление
-                {
-                    if (asciiMatrix[i][j].text() != QString(info))
-                        asciiMatrix[i][j].setText(QString(info));
-                }
-                else //если нет, вместо него печатаем точку
-                    asciiMatrix[i][j].setText(".");
-                for (int i = 0; i < 2;i++) //Пишем в байтовое представление
-                {
-                    str = alphabet[info%16]+str;
-                    info /= 16;
-                }
-                if (matrix[i][j].text() != str)
-                    matrix[i][j].setText(str);
+                    matrix[i][j].setHtml(QString("<div style='background-color:") + QString(ishighlighted ? "blue;" : "white;")+ QString(" font-family:Courier New;") + QString(isinseq ? "color:#FF4000;'>" : ishighlighted ? "color:white;'>": "color:black;'>" ) + str + "</div>");
                 }
                 else//если символа не существует, то пишем черный вопросительный знак
                 {
-                    if (asciiMatrix[i][j].brush() != QBrush(Qt::black))
-                        asciiMatrix[i][j].setBrush(QBrush(Qt::black));
-                    if (matrix[i][j].brush() != QBrush(Qt::black))
-                        matrix[i][j].setBrush(QBrush(Qt::black));
-                    if (asciiMatrix[i][j].text() != "?")
-                        asciiMatrix[i][j].setText("?");
+                    if (dataView->width() > 750)
+                        asciiMatrix[i][j].setHtml(QString("<div style='background-color:white; font-family:Courier New; color:black;'>" ) + "?</div>");
+                    matrix[i][j].setHtml("<div style='background-color:white; font-family:Courier New;color:black;'>?? </div>");
 
-                    if (matrix[i][j].text() != "??")
-                        matrix[i][j].setText("??");
                 }
-            }
+
         }
     }
 }
@@ -186,25 +170,27 @@ void QByteView::redrawHex()
     dataView->switchViews(false);
     int offset = 600, strOffset = 0;
     lineSz = 20;
-    dispLines_ = this->height()/20;
+    dispLines_ = this->height()/20 - 1;
     //переназначаем максимум скроллбара
     scroller->setMaximum(max(log->linesAmt() - dispLines_ + 1, 0));
     //создаём и размещаем элементы по новой
-    asciiMatrix = new QGraphicsSimpleTextItem*[dispLines_];
-    matrix = new QGraphicsSimpleTextItem*[dispLines_];
+    asciiMatrix = new QGraphicsTextItem*[dispLines_];
+    matrix = new QGraphicsTextItem*[dispLines_];
     for (int i = 0; i < dispLines_; i++)
     {
-        asciiMatrix[i] = new QGraphicsSimpleTextItem[20];
-        matrix[i] = new QGraphicsSimpleTextItem[20];
+        asciiMatrix[i] = new QGraphicsTextItem[20];
+        matrix[i] = new QGraphicsTextItem[20];
     }
     for (int i = 0; i < dispLines_; i++)
         for (int j = 0; j < lineSz; j++)
         {
             matrix[i][j].setFont(fnt);
             data->addItem(&matrix[i][j]);
-            data->addItem(&asciiMatrix[i][j]);
-            matrix[i][j].moveBy(strOffset+5+30*j, 20*i);
-            asciiMatrix[i][j].moveBy(offset+5+7*j, 20*i);
+            if (dataView->width() > 750)
+                data->addItem(&asciiMatrix[i][j]);
+            matrix[i][j].moveBy(strOffset+30*j, 20*i-4);
+            if (dataView->width() > 750)
+                asciiMatrix[i][j].moveBy(offset+7*j-1, 20*i-4);
         }
     //размещаем выделяющие квадраты
     dataView->initRect();
@@ -219,88 +205,84 @@ void QByteView::rewriteAscii()
 {
     for (int i = 0; i < dispLines_; i++)
     {
-        unsigned char* ln = log->asciiLine(scroller->value()+i+((log->asciiLineLen(0) == 0 && scroller->value() > 0) ? 1 : 0));
+        unsigned char* ln = log->asciiLine(scroller->value()+i+1+((log->asciiLineLen(0) == 0 && scroller->value() > 0) ? 1 : 0)); //+((log->asciiLineLen(0) == 0 && scroller->value() > 0) ? 1 : 0)
         QString d = QString(reinterpret_cast<char*>(ln));
         for (int j = 0; j < lineSz; j++)
         {
+            bool isinseq = searchQuery.length() > 0 && log->isInSeq(log->getFirstSymInAsciiLine(scroller->value()+i-((log->asciiLineLen(0) == 0) ? 0 : 1) + 1)+j, searchQuery.data(), searchQuery.length());
             if (j < d.length())
             {
-                if (asciiMatrix[i][j].brush() !=QBrush(Qt::black))
-                    asciiMatrix[i][j].setBrush(QBrush(Qt::black));
-                if (asciiMatrix[i][j].text() != d.at(j))
-                    asciiMatrix[i][j].setText(d.at(j));
+                asciiMatrix[i][j].setTextWidth(20);
+                asciiMatrix[i][j].setHtml("<div style='background-color:white; font-family:Courier New; height:20;"+ QString(isinseq ? "color:#FF4000;'>" : "color:black;'>" ) + QString(d.at(j)) + "</div>");
                 if (log->asciiSel1Active() && log->asciiSel2Active())
                 {
                     if((scroller->value() + i  > log->asciiSel1Line() && scroller->value() + i  < log->asciiSel2Line()) || (scroller->value() + i  > log->asciiSel2Line() && scroller->value() + i  < log->asciiSel1Line()))
                     {
-                        if (asciiMatrix[i][j].brush() !=QBrush(Qt::red))
-                            asciiMatrix[i][j].setBrush(QBrush(Qt::red));
+                        asciiMatrix[i][j].setHtml(QString("<div style='background-color:blue; font-family:Courier New;") + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(j)) + "</div>");
                     }
                     if (log->asciiSel1Line() < log->asciiSel2Line())
                     {
                         if (scroller->value() + i  == log->asciiSel1Line())
                         {
-                            if (j > log->asciiSel1Sym() && asciiMatrix[i][j].brush() !=QBrush(Qt::red))
-                                asciiMatrix[i][j].setBrush(QBrush(Qt::red));
+
+                            if (j > log->asciiSel1Sym())
+                                asciiMatrix[i][j].setHtml(QString("<div style='background-color:blue; font-family:Courier New;") + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(j)) + "</div>");
+
                         }
-                        if (scroller->value() + i  == log->asciiSel2Line() && asciiMatrix[i][j].brush() !=QBrush(Qt::red))
+                        if (scroller->value() + i  == log->asciiSel2Line())
                         {
                             if (j < log->asciiSel2Sym())
-                                asciiMatrix[i][j].setBrush(QBrush(Qt::red));
+                            asciiMatrix[i][j].setHtml(QString("<div style='background-color:blue;font-family:Courier New;") + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(j)) + "</div>");
+
                         }
                     }
                     if (log->asciiSel1Line() > log->asciiSel2Line())
                     {
                         if (scroller->value() + i  == log->asciiSel1Line())
                         {
-                            if (j < log->asciiSel1Sym() && asciiMatrix[i][j].brush() !=QBrush(Qt::red))
-                                asciiMatrix[i][j].setBrush(QBrush(Qt::red));
+                            if (j < log->asciiSel1Sym())
+                                asciiMatrix[i][j].setHtml("<div style='background-color:blue; font-family:Courier New;" + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(j)) + "</div>");
+
                         }
                         if (scroller->value() + i  == log->asciiSel2Line())
                         {
-                            if (j > log->asciiSel2Sym() &&asciiMatrix[i][j].brush() !=QBrush(Qt::red))
-                                asciiMatrix[i][j].setBrush(QBrush(Qt::red));
+                            if (j > log->asciiSel2Sym())
+                                asciiMatrix[i][j].setHtml("<div style='background-color:blue; font-family:Courier New;" + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(j)) + "</div>");
+
                         }
                     }
                     if (log->asciiSel1Line() == log->asciiSel2Line())
                     {
                         if (scroller->value() + i  == log->asciiSel1Line())
                         {
-                            if (log->asciiSel1Sym() < log->asciiSel2Sym())
-                            {
-                                if (j > log->asciiSel1Sym() && j < log->asciiSel2Sym() && asciiMatrix[i][j].brush() !=QBrush(Qt::red))
-                                    asciiMatrix[i][j].setBrush(QBrush(Qt::red));
-                            }
-                            if (log->asciiSel1Sym() > log->asciiSel2Sym())
-                            {
-                                if (j < log->asciiSel1Sym() && j > log->asciiSel2Sym() && asciiMatrix[i][j].brush() !=QBrush(Qt::red))
-                                    asciiMatrix[i][j].setBrush(QBrush(Qt::red));
-                            }
+                            if ((j > log->asciiSel2Sym() && j < log->asciiSel1Sym()) || (j < log->asciiSel2Sym() && j > log->asciiSel1Sym()))
+                                 asciiMatrix[i][j].setHtml("<div style='background-color:blue; font-family:Courier New;" + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(j)) + "</div>");
                         }
                     }
                 }
                 if (log->asciiSel1Active())
                 {
-                    if (scroller->value() + i == log->asciiSel1Line() && j == log->asciiSel1Sym() && asciiMatrix[i][j].brush() !=QBrush(Qt::green))
+                    if (scroller->value() + i == log->asciiSel1Line() && j == log->asciiSel1Sym())
                     {
-                        asciiMatrix[i][j].setBrush(QBrush(Qt::green));
+                        asciiMatrix[i][j].setHtml("<div style='background-color:blue;font-family:Courier New;" + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(j)) + "</div>");
+
                     }
                 }
                 if (log->asciiSel2Active())
                 {
                     if (scroller->value() + i == log->asciiSel2Line() && j == log->asciiSel2Sym())
                     {
-                        asciiMatrix[i][j].setBrush(QBrush(Qt::cyan));
+                        asciiMatrix[i][j].setHtml("<div style='background-color:blue; font-family:Courier New;" + QString(isinseq ? "color:#FF4000;'>" : "color:white;'>" ) + QString(d.at(j)) + "</div>");
+
                     }
                 }
-                if (searchQuery.length() > 0 && log->isInSeq(log->getFirstSymInAsciiLine(scroller->value()+i-((log->asciiLineLen(0) == 0) ? 0 : 1))+j, searchQuery.data(), searchQuery.length()))
-                {
-                    asciiMatrix[i][j].setBrush(QBrush(QColor(0xff, 0x9b, 0, 255)));
-                }
+
             }
             else
-                asciiMatrix[i][j].setText("");
+            {
+                asciiMatrix[i][j].setHtml("");
             }
+        }
         free(ln);
     }
 }
@@ -318,15 +300,15 @@ void QByteView::redrawAscii()
     data->clear();
     dataView->switchViews(true);
     lineSz = this->width()/8;
-    dispLines_ = this->height()/20;
+    dispLines_ = this->height()/20 - 1;
     scroller->setMaximum(max(log->asciiLines() - dispLines_+ 1, 0));
     int strOffset = 0;
-    asciiMatrix = new QGraphicsSimpleTextItem*[dispLines_];
-    matrix = new QGraphicsSimpleTextItem*[dispLines_];
+    asciiMatrix = new QGraphicsTextItem*[dispLines_];
+    matrix = new QGraphicsTextItem*[dispLines_];
     for (int i = 0; i < dispLines_; i++)
     {
-            asciiMatrix[i] = new QGraphicsSimpleTextItem[lineSz];
-            matrix[i] = new QGraphicsSimpleTextItem[1];
+            asciiMatrix[i] = new QGraphicsTextItem[lineSz];
+            matrix[i] = new QGraphicsTextItem[1];
     }
 
     for (int i = 0; i < dispLines_; i++)
@@ -334,7 +316,7 @@ void QByteView::redrawAscii()
         for (int j = 0; j < lineSz;j++)
         {
             data->addItem(&asciiMatrix[i][j]);
-            asciiMatrix[i][j].moveBy(strOffset+8*j, 20*i);
+            asciiMatrix[i][j].moveBy(strOffset+8*j-4, 20*i-4);
         }
     }
     dataView->initRect();
@@ -362,14 +344,6 @@ void QByteView::redraw()
 void QByteView::exportSelected(int first, int last)
 {
     int firstData, lastData;
-    QDateTime dt = QDateTime::currentDateTime();
-    QString yr = QString::number(dt.date().year());
-    QString mn = QString::number(dt.date().month() / 10)+QString::number(dt.date().month() % 10);
-    QString dy = QString::number(dt.date().day() / 10)+QString::number(dt.date().day() % 10);
-    QString hr = QString::number(dt.time().hour() / 10)+QString::number(dt.time().hour() % 10);
-    QString mt = QString::number(dt.time().minute() / 10)+QString::number(dt.time().minute() % 10);
-    QString sc = QString::number(dt.time().second() / 10)+QString::number(dt.time().second() % 10);
-    QString res = "log-t-" + hr + "-" + mt + "-" + sc + "-d-" + dy + "-" + mn + "-" + yr + ".txt";
     if (first < 0 && last < 0)
     {
         firstData = min(log->firstSel(), log->secondSel());
@@ -389,8 +363,11 @@ void QByteView::exportSelected(int first, int last)
         QString hr = QString::number(dt.time().hour() / 10)+QString::number(dt.time().hour() % 10);
         QString mt = QString::number(dt.time().minute() / 10)+QString::number(dt.time().minute() % 10);
         QString sc = QString::number(dt.time().second() / 10)+QString::number(dt.time().second() % 10);
-        QString res = "log-t-" + hr + "-" + mt + "-" + sc + "-d-" + dy + "-" + mn + "-" + yr + ".txt";
-        QFile file("log-t-" + hr + "-" + mt + "-" + sc + "-d-" + dy + "-" + mn + "-" + yr + ".txt");
+        QString res = dir;
+        if (res.at(res.length()-1) != '/')
+            res+="/";
+        res += "log-t-" + hr + "-" + mt + "-" + sc + "-d-" + dy + "-" + mn + "-" + yr + ".txt";
+        QFile file(res);
         QTextStream stream(&file);
         if(file.open(QIODevice::WriteOnly | QIODevice::Text))
         {
@@ -445,7 +422,7 @@ void QByteView::putData(const QByteArray & arr)
         else
         {
             newMaxLines = log->asciiLines()-dispLines_;
-            scroller->setMaximum(max(log->linesAmt() - dispLines_ + 1, 0));
+            scroller->setMaximum(max(log->asciiLines() - dispLines_ + 1, 0));
             //В текстовом представлении запоминаем сдвиг по ASCII.
             shift = log->asciiShift();
         }
@@ -459,7 +436,6 @@ void QByteView::putData(const QByteArray & arr)
             log->setSecondSel(log->size() - 1);
         }
         shouldRewrite = true;
-
 }
 
 void QByteView::putData(const QString & str)
@@ -503,6 +479,7 @@ QByteView::~QByteView()
 int QByteView::search(QByteArray query)
 {
     searchQuery = query;
+    shouldUpdate = true;
     return 1;
 }
 
@@ -583,16 +560,6 @@ void QByteView::slotClear()
     clear();
 }
 
-void QByteView::slotChooseFirst()
-{
-    chooseFirst = true;
-}
-
-void QByteView::slotChooseSecond()
-{
-    chooseFirst = false;
-}
-
 void QByteView::slotScrDwn()
 {
     scroller->setValue(scroller->maximum());
@@ -658,6 +625,15 @@ void QByteView::slotUpdateTimeout()
     }
 }
 
+void QByteView::slotChooseDirectory()
+{
+
+    dir = QFileDialog::getExistingDirectory(this, tr("Open Directory"),
+                                                 "./",
+                                                 QFileDialog::ShowDirsOnly
+                                                 | QFileDialog::DontResolveSymlinks);
+}
+
 void QByteView::contextMenuEvent(QContextMenuEvent *e)
 {
     QMenu* pContextMenu = new QMenu( this);
@@ -672,29 +648,11 @@ void QByteView::contextMenuEvent(QContextMenuEvent *e)
     pContextMenu->addSeparator();
     QAction *pCopy = new QAction("Copy",this);
     connect(pCopy ,SIGNAL(triggered()),this,SLOT(slotCopy()));
-    QAction *pEnableHighlighting = new QAction("Enable highlight editing",this);
-    connect(pEnableHighlighting ,SIGNAL(triggered()),this,SLOT(slotEnableHighlighting()));
-    pEnableHighlighting->setCheckable(true);
-    pEnableHighlighting->setChecked(enableHighlight);
-    QAction *pChooseFirst = new QAction("Choose green element",this);
-    connect(pChooseFirst ,SIGNAL(triggered()),this,SLOT(slotChooseFirst()));
-    pChooseFirst->setCheckable(true);
-    pChooseFirst->setChecked(chooseFirst);
-    pChooseFirst->setEnabled(enableHighlight);
-    QAction *pChooseSecond = new QAction("Choose cyan element",this);
-    connect(pChooseSecond ,SIGNAL(triggered()),this,SLOT(slotChooseSecond()));
-    pChooseSecond->setCheckable(true);
-    pChooseSecond->setChecked(!chooseFirst);
-    pChooseSecond->setEnabled(log->firstSel() >= 0 && enableHighlight);
     pContextMenu->addAction(pCopy);
     pContextMenu->addSeparator();
-    pContextMenu->addAction(pEnableHighlighting);
-    pContextMenu->addAction(pChooseFirst);
-    pContextMenu->addAction(pChooseSecond);
     QAction *pSelectAll = new QAction("Select all",this);
     connect(pSelectAll ,SIGNAL(triggered()),this,SLOT(slotSelectAll()));
     pContextMenu->addAction(pSelectAll);
-    pContextMenu->addSeparator();
     QAction *pGoToHighlighted = new QAction("Go to highlighted",this);
     connect(pGoToHighlighted ,SIGNAL(triggered()),this,SLOT(slotGoToHighlighted()));
     pContextMenu->addAction(pGoToHighlighted);
@@ -702,6 +660,9 @@ void QByteView::contextMenuEvent(QContextMenuEvent *e)
     QAction *pExport = new QAction("Export selected",this);
     connect(pExport ,SIGNAL(triggered()),this,SLOT(slotExportSelected()));
     pContextMenu->addAction(pExport);
+    QAction *pChooseDirectory = new QAction("Choose directory",this);
+    connect(pChooseDirectory ,SIGNAL(triggered()),this,SLOT(slotChooseDirectory()));
+    pContextMenu->addAction(pChooseDirectory);
     pContextMenu->addSeparator();
     pContextMenu->addAction(pScrDwnAction);
     pContextMenu->exec(e->globalPos());
@@ -710,32 +671,74 @@ void QByteView::contextMenuEvent(QContextMenuEvent *e)
 
 void QByteView::mousePressEvent(QMouseEvent *event)
 {
-    if (event->buttons() == Qt::LeftButton && enableHighlight)
+    if (event->buttons() == Qt::LeftButton)
     {
         log->setSelectAll(false);
         int rw = static_cast<int>(dataView->getY());
         int cl = static_cast<int>(dataView->getX());
+        int elNum;
         if (isTextDisplayed_)
-        {
-            if (cl <= log->asciiLineLen(scroller->value() + rw) && enableHighlight)
-            {
-                if (chooseFirst)
-                    log->setFirstSel(log->getFirstSymInAsciiLine(scroller->value() + rw) + min(log->asciiLineLen(scroller->value() + rw), cl));
-                else
-                    log->setSecondSel(log->getFirstSymInAsciiLine(scroller->value() + rw) + min(log->asciiLineLen(scroller->value() + rw), cl));
-            }
-        }
+            elNum = log->getFirstSymInAsciiLine(scroller->value() + rw) + min(log->asciiLineLen(scroller->value() + rw), cl);
         else
+            elNum = static_cast<int>((scroller->value() + rw) * 20 + cl);
+        if (cl <= log->asciiLineLen(scroller->value() + rw) && enableHighlight)
         {
-            if (event->pos().x() < 600)
+            if (isShiftPressed)
             {
-                if (chooseFirst)
-                    log->setFirstSel(static_cast<int>((scroller->value() + rw) * 20 + cl));
+                if (log->asciiSel1Active() && log->asciiSel2Active())
+                {
+                    if (abs(elNum - log->firstSel()) < abs(elNum - log->secondSel()))
+                    {
+                        log->setFirstSel(elNum);
+                    }
+                    else
+                    {
+                        log->setSecondSel(elNum);
+                    }
+                }
                 else
-                    log->setSecondSel(static_cast<int>((scroller->value() + rw) * 20 + cl));
+                {
+                    if (chooseFirst)
+                        log->setFirstSel(elNum);
+                    else
+                        log->setSecondSel(elNum);
+                    chooseFirst = !chooseFirst;
+                }
+            }
+            else
+            {
 
+                log->setFirstSel(elNum);
+                log->setSecondSel(elNum);
             }
         }
         rewrite();
     }
+
+}
+
+void QByteView::keyPressEvent(QKeyEvent *e)
+{
+    if (e->key() == Qt::Key_Shift)
+    {
+        isShiftPressed = true;
+    }
+}
+
+void QByteView::keyReleaseEvent(QKeyEvent *e)
+{
+    if (e->key() == Qt::Key_Shift)
+    {
+        isShiftPressed = false;
+    }
+
+}
+
+void QByteView::wheelEvent(QWheelEvent *e)
+{
+    if (e->delta() > 0)
+        scroller->setValue(min(scroller->value() - e->delta() / 40, scroller->maximum()));
+    else
+        scroller->setValue(max(scroller->value() - e->delta() / 40, scroller->minimum()));
+    shouldUpdate = true;
 }

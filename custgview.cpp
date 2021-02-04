@@ -82,7 +82,7 @@ void custGView::mouseMoveEvent(QMouseEvent *event)
         if (event->pos().x() < 600)
         {
             col[0] = event->pos().x() - event->pos().x() % 30;
-            col[1] = static_cast<int>((col[0] - 50)/4.3+615);
+            col[1] = static_cast<int>((col[0] - 50)/4.3+(this->width() > 755 ? 615 : 755));
             hexChoice->setX(col[0]);
             asciiChoice->setX(col[1]);
         }

@@ -94,7 +94,7 @@ bool byteLog::asciiSel2Active()
 
 void byteLog::redoAsciiChoice(int sel, int *asel)
 {
-    asel[0] = 1; //Активен ли
+    asel[0] = 1; //Активно ли выделение
     asel[1] = 0; //Номер строки
     asel[2] = 0; //Номер символа в строке
 
@@ -105,6 +105,9 @@ void byteLog::redoAsciiChoice(int sel, int *asel)
     else
         for (int i = 0; i < FSIASSize_; i++)
             if ((FSIAS_[i] <= sel && FSIAS_[i+1] > sel) || i == FSIASSize_-1)
+    // Часть до "или" - для проверки наличия символа в первой-предпоследней
+    // строке. Если символ находится между первыми символами строк i и i+1,
+    // значит строка i - искомая.
             {
                 asel[1] = i;
                 asel[2] = sel - FSIAS_[i];

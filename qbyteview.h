@@ -7,8 +7,10 @@
  */
 
 #include <QMouseEvent>
+#include <QWheelEvent>
 
 #include <QWidget>
+#include <QFileDialog>
 #include <QPlainTextEdit>
 #include <QHBoxLayout>
 #include <QString>
@@ -37,12 +39,14 @@ Q_OBJECT
 private:
 
 protected:
+
     QScrollBar  *hscroller, *vscroller, *scroller;
     QHBoxLayout* mainLayout;
     QGraphicsScene* data;
     custGView* dataView;
-    QGraphicsSimpleTextItem**matrix; //Для байтового предст.
-    QGraphicsSimpleTextItem**asciiMatrix; //Для текстового предст.
+    QString dir;
+    QGraphicsTextItem**matrix; //Для байтового предст.
+    QGraphicsTextItem**asciiMatrix; //Для текстового предст.
     QFont fnt;
     /*
      * при изменении размеров окна происходит
@@ -72,6 +76,7 @@ protected:
     bool isTextDisplayed_; //True - текстовое представление. False - байтовое.
     bool enableHighlight;  //True - ползователь может выделять текст. False - не может.
     bool chooseFirst; //True - пользователь выбирает первый элемент. False - второй.
+    bool isShiftPressed;
     byteLog* log; //Тут будем хранить данные.
     int linesAmt_; //максимум строк в байтовом представлении
     int lineSz; //размер байтовой строки
@@ -89,6 +94,10 @@ protected:
     void resizeEvent(QResizeEvent *e);
     void contextMenuEvent( QContextMenuEvent * e );
     void mousePressEvent(QMouseEvent *event);
+    void keyPressEvent(QKeyEvent *e);
+    void keyReleaseEvent(QKeyEvent *e);
+    void wheelEvent(QWheelEvent *e);
+
 public:
     QByteView(int linesAmt, QGroupBox *parent = nullptr);
     /*
@@ -213,8 +222,6 @@ protected slots:
     void slotSwitchViews(); //вызывает switchViews()
     void slotClear(); //вызывает switchViews()
     void slotCopy(); //копирует выделенный текст
-    void slotChooseFirst(); //chooseFirst становится true
-    void slotChooseSecond(); //chooseFirst становится false
     void slotScrDwn(); //присваивает скроллбару максимальное
     //значение и переписывает текст
     void slotGoToHighlighted(); // двигает скроллбар к первому
@@ -222,6 +229,7 @@ protected slots:
     void slotEnableHighlighting(); //включает/отключает выделение
     //посредством enableHighlight
     void slotExportSelected(); //вызывает exportSelected()
+    void slotChooseDirectory();
     void slotSelectAll(); //включает/отключает режим "выбрать
     //всё". При выделении пользователем одного из элементов режим
     //отключается.
