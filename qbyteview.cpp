@@ -314,7 +314,7 @@ void QByteView::redrawAscii()
     data->clear();
     dataView->switchViews(true);
     lineSz = this->width()/8;
-    dispLines_ = this->height()/20 - 1;
+    dispLines_ = this->height()/20 - 2;
     scroller->setMaximum(max(log->asciiLines() - dispLines_+ 1, 0));
     int strOffset = 0;
     asciiMatrix = new QGraphicsTextItem*[dispLines_];
